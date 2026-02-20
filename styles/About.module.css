@@ -1,0 +1,97 @@
+.aboutPage {
+  width: min(900px, 92vw);
+  margin: 1.2rem auto 2.5rem;
+}
+
+.card {
+  background: linear-gradient(180deg, #fffaf0 0%, #fff9eb 100%);
+  border-left: 2px solid #8a2b1a;
+  border-top: 1px solid #6f2718;
+  border-right: 1px solid #cfbca6;
+  border-bottom: 2px solid #cfbca6;
+  padding: 1.45rem;
+  box-shadow: 0 10px 22px rgba(41, 28, 18, 0.12);
+}
+
+.card h1 {
+  margin-bottom: 0.7rem;
+  margin-top: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-family: var(--font-display);
+  border-bottom: 1px solid var(--accent);
+  display: inline-block;
+  padding-bottom: 0.25rem;
+}
+
+.card p {
+  color: var(--muted);
+  line-height: 1.7;
+  max-width: 78ch;
+}
+
+.lede {
+  color: #3c2f25;
+  font-weight: 600;
+}
+
+.ritualBlock {
+  margin-top: 0.4rem;
+  margin-bottom: 0.7rem;
+  border-left: 3px solid #8a2b1a;
+  padding-left: 0.7rem;
+}
+
+.ritualLine {
+  display: block;
+  margin-top: 0.18rem;
+  font-weight: 700;
+  color: #5e240f;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.subtext {
+  color: #5e4d41;
+}
+
+.closing {
+  margin-top: 1.4rem;
+  color: #5a483c;
+  border-top: 1px dashed #d6bea8;
+  padding-top: 0.75rem;
+  font-weight: 700;
+}
+
+.signature {
+  color: #5e240f;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent);
+  font-weight: 700;
+  margin-bottom: 0.48rem;
+  border-bottom: 1px dashed currentColor;
+  padding-bottom: 0.05rem;
+}
+
+.badge::after {
+  content: "";
+  display: block;
+  margin-top: 0.35rem;
+  width: 26px;
+  height: 1px;
+  background: #8a2b1a;
+}
+
+@media (max-width: 760px) {
+  .aboutPage {
+    width: min(900px, 94vw);
+  }
+}

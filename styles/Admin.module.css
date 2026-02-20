@@ -1,0 +1,278 @@
+.page {
+  width: min(980px, 92vw);
+  margin: 1.1rem auto 2rem;
+  display: grid;
+  gap: 0.9rem;
+}
+
+.panel {
+  background: linear-gradient(180deg, #fffaf0 0%, #fff9eb 100%);
+  border-left: 2px solid #8a2b1a;
+  border-top: 1px solid #6f2718;
+  border-right: 1px solid #cfbca6;
+  border-bottom: 2px solid #cfbca6;
+  padding: 1.2rem;
+  box-shadow: 0 10px 22px rgba(41, 28, 18, 0.12);
+}
+
+.badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent);
+  font-weight: 700;
+  margin-bottom: 0.45rem;
+  border-bottom: 1px dashed currentColor;
+}
+
+.panel h1 {
+  margin-top: 0;
+}
+
+.help {
+  color: #5d4f46;
+}
+
+.warning {
+  margin: 0.45rem 0 0.55rem;
+  border-left: 3px solid #b24d2f;
+  background: #fff3e3;
+  color: #6f2f1d;
+  padding: 0.55rem 0.62rem;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.galleryDisabledNotice {
+  opacity: 0.88;
+}
+
+.galleryList {
+  list-style: none;
+  margin: 0.85rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.galleryItem {
+  display: grid;
+  grid-template-columns: 68px 1fr auto;
+  align-items: center;
+  gap: 0.55rem;
+  border-top: 1px dashed #c5af9a;
+  padding-top: 0.5rem;
+}
+
+.galleryThumb {
+  width: 68px;
+  height: 68px;
+  object-fit: cover;
+  border: 1px solid #c9b199;
+  background: #fff;
+}
+
+.galleryMeta {
+  min-width: 0;
+}
+
+.galleryMeta small {
+  display: block;
+  color: #6e5b4d;
+  font-size: 0.73rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.galleryActions {
+  display: flex;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.form {
+  margin-top: 0.8rem;
+  display: grid;
+  gap: 0.72rem;
+  max-width: 460px;
+}
+
+.form label {
+  display: grid;
+  gap: 0.28rem;
+  color: #3e2f24;
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.form input {
+  border: 1px solid #b09a86;
+  background: #fff;
+  padding: 0.58rem 0.65rem;
+  font-size: 0.95rem;
+}
+
+.form select {
+  border: 1px solid #b09a86;
+  background: #fff;
+  padding: 0.58rem 0.65rem;
+  font-size: 0.95rem;
+}
+
+.form button {
+  margin-top: 0.2rem;
+  padding: 0.72rem 0.9rem;
+  border: 2px solid #2c241e;
+  background: #fff9ed;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+
+.form button:hover {
+  background: #8a2b1a;
+  color: #fff;
+}
+
+.message {
+  margin-top: 0.55rem;
+  color: #5f4f43;
+}
+
+.pendingList,
+.placeList {
+  margin: 0.75rem 0 0;
+  padding-left: 1.1rem;
+}
+
+.pendingList li {
+  margin: 0 0 0.45rem;
+  color: #5d4f43;
+}
+
+.placeRow {
+  border-top: 1px dashed #ad9987;
+  padding: 0.58rem 0;
+  display: grid;
+  gap: 0.2rem;
+  color: #5b4c44;
+}
+
+.placeRow strong {
+  letter-spacing: 0.04em;
+}
+
+.placeRow span {
+  font-size: 0.86rem;
+  color: var(--accent);
+}
+
+.placeRow small {
+  font-size: 0.8rem;
+}
+
+.textButton {
+  margin-top: 0.7rem;
+  background: transparent;
+  border: 0;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.8rem;
+  color: #5d4c42;
+  cursor: pointer;
+}
+
+.textButton:hover {
+  color: var(--accent);
+}
+
+.userMeta {
+  margin-left: 0.35rem;
+  color: #6f5c4d;
+  font-size: 0.75rem;
+}
+
+.passwordList {
+  margin: 0.75rem 0 0;
+  padding-left: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.passwordList li {
+  list-style: none;
+  border-top: 1px dashed #bca38d;
+  padding-top: 0.58rem;
+  display: grid;
+  gap: 0.36rem;
+}
+
+.passwordHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.42rem;
+  flex-wrap: wrap;
+}
+
+.passwordInputRow {
+  display: grid;
+  gap: 0.28rem;
+}
+
+.passwordLabel {
+  font-size: 0.74rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #5d4f46;
+}
+
+.passwordInput {
+  border: 1px solid #b09a86;
+  background: #fff;
+  padding: 0.52rem 0.62rem;
+  font-size: 0.9rem;
+}
+
+.googleLink {
+  display: inline-block;
+  margin-top: 0.28rem;
+  font-size: 0.82rem;
+  color: #4f3d31;
+  text-decoration: none;
+}
+
+.googleLink:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.addressList {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  border: 1px solid #c4b09e;
+  background: #fff8ee;
+  max-height: 210px;
+  overflow: auto;
+}
+
+.addressItem {
+  border-top: 1px dashed #ccbaa8;
+  padding: 0.54rem 0.62rem;
+  font-size: 0.84rem;
+  color: #3c2f24;
+  cursor: pointer;
+}
+
+.addressItem:hover,
+.addressItem:focus-visible {
+  background: #f3e1cc;
+  outline: none;
+}

@@ -1,0 +1,83 @@
+.page {
+  width: min(1040px, 92vw);
+  margin: 1.2rem auto 2.5rem;
+}
+
+.card {
+  background: linear-gradient(180deg, #fffaf0 0%, #fff9eb 100%);
+  border-left: 2px solid #8a2b1a;
+  border-top: 1px solid #6f2718;
+  border-right: 1px solid #cfbca6;
+  border-bottom: 2px solid #cfbca6;
+  padding: 1.3rem;
+  box-shadow: 0 10px 22px rgba(41, 28, 18, 0.12);
+}
+
+.badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent);
+  font-weight: 700;
+  margin-bottom: 0.45rem;
+  border-bottom: 1px dashed currentColor;
+  padding-bottom: 0.05rem;
+}
+
+.card h1 {
+  margin: 0 0 0.5rem;
+}
+
+.lead {
+  margin: 0 0 1rem;
+  color: var(--muted);
+}
+
+.listWrap {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.row {
+  border-top: 1px solid #a56f5f;
+  border-left: 2px solid #8a2b1a;
+  background: #fff4df;
+  padding: 0.8rem 0.95rem;
+  margin-bottom: 0.4rem;
+}
+
+.row h2 {
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  font-family: var(--font-display);
+}
+
+.row p.date {
+  color: #8a2b1a;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.row h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.date {
+  margin: 0.25rem 0 0.55rem;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.row p {
+  margin: 0;
+  color: var(--muted);
+}
+
+@media (max-width: 760px) {
+  .page {
+    width: min(1040px, 94vw);
+    margin-top: 0.85rem;
+  }
+}

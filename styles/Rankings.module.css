@@ -1,0 +1,442 @@
+.page {
+  width: min(920px, 92vw);
+  margin: 1.2rem auto 2rem;
+}
+
+.panel {
+  background: linear-gradient(180deg, #fffaf0 0%, #fff9eb 100%);
+  border-left: 2px solid #8a2b1a;
+  border-top: 1px solid #6f2718;
+  border-right: 1px solid #cfbca6;
+  border-bottom: 2px solid #cfbca6;
+  padding: 1.2rem;
+  box-shadow: 0 10px 22px rgba(41, 28, 18, 0.12);
+}
+
+.badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent);
+  font-weight: 700;
+  margin-bottom: 0.45rem;
+  border-bottom: 1px dashed currentColor;
+}
+
+.headerActions {
+  margin: 0.15rem 0 0.75rem;
+}
+
+.panel h1,
+.panel h2 {
+  margin-top: 0;
+}
+
+.lead {
+  color: var(--muted);
+  margin: 0.2rem 0 0.85rem;
+}
+
+.subtle {
+  color: #5c5248;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.76rem;
+}
+
+.userMenu {
+  margin-top: 1rem;
+  padding: 0.85rem 0.95rem;
+  border: 2px dashed #2f261f;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.76) 0 9px,
+      rgba(255, 255, 255, 0) 9px 12px
+    ),
+    linear-gradient(180deg, #fff8eb, #f6e4ca);
+  box-shadow: inset 0 0 0 1px rgba(47, 38, 31, 0.3);
+}
+
+.menuTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  letter-spacing: 0.15em;
+  font-size: 1rem;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.menuSub {
+  margin: 0.24rem 0 0.72rem;
+  font-size: 0.74rem;
+  letter-spacing: 0.17em;
+  text-transform: uppercase;
+  color: #4f453c;
+}
+
+.userMenuList {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.userMenuItem {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.55rem 0.78rem;
+  background: rgba(255, 248, 235, 0.82);
+  border: 2px solid #2c251f;
+  border-left-width: 4px;
+  cursor: pointer;
+}
+
+.menuSeatName {
+  margin: 0;
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  font-weight: 700;
+  color: #2f261f;
+}
+
+.userMenuRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.45rem;
+}
+
+.seatPassword {
+  padding: 0.58rem 0.55rem;
+  border: 2px solid #2f261f;
+  font-size: 0.89rem;
+  font-family: inherit;
+  letter-spacing: 0.02em;
+  background: #fffdf7;
+}
+
+.seatPassword:focus {
+  outline: 2px solid rgba(138, 43, 26, 0.35);
+  outline-offset: 1px;
+}
+
+.authError {
+  margin: 0;
+  font-size: 0.74rem;
+  color: #8a2b1a;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.stateWrap {
+  margin-top: 1rem;
+  position: relative;
+}
+
+.gameWrap {
+  margin-top: 0.6rem;
+  border: 2px solid #8a2b1a;
+  background: linear-gradient(180deg, #fffaf0 0, #f8ebd6 100%);
+  padding: 0.85rem 0.9rem 0.95rem;
+  box-shadow: inset 0 0 0 1px #b98f72;
+  position: relative;
+}
+
+.gameWrap::before {
+  content: "";
+  position: absolute;
+  left: 0.45rem;
+  right: 0.45rem;
+  top: 0.38rem;
+  height: 2px;
+  background: repeating-linear-gradient(
+    90deg,
+    #8a2b1a 0 6px,
+    transparent 6px 12px
+  );
+}
+
+.placeHintBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 0.8rem;
+  background: rgba(29, 20, 12, 0.38);
+}
+
+.placeHintCard {
+  width: min(92vw, 520px);
+  border: 2px solid #2f261f;
+  background: linear-gradient(180deg, #fff6de 0%, #f7e0c0 100%);
+  padding: 0.8rem;
+  box-shadow: 0 12px 22px rgba(34, 24, 16, 0.28);
+  text-align: left;
+}
+
+.placeHintCard .currentPlace {
+  margin-top: 0;
+  margin-bottom: 0.55rem;
+  font-size: 1rem;
+  letter-spacing: 0.03em;
+}
+
+.placeHintText {
+  margin: 0 0 0.8rem;
+  color: #2e241e;
+  line-height: 1.45;
+  font-size: 0.95rem;
+}
+
+.placeHintCard .choiceButton {
+  margin: 0;
+}
+
+.progressText {
+  margin: 0.2rem 0 0.2rem;
+  font-size: 0.9rem;
+  color: #5e4f43;
+}
+
+.progressBar {
+  height: 8px;
+  border: 1px solid #5e4f43;
+  margin-bottom: 0.8rem;
+}
+
+.progressFill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  width: 0;
+}
+
+.currentPlace {
+  font-size: 1.1rem;
+  margin: 0.25rem 0 0.15rem;
+  font-weight: 700;
+}
+
+.currentPlaceMeta {
+  color: #5d4f45;
+}
+
+.decisionRow {
+  margin-top: 0.8rem;
+  display: grid;
+  gap: 0.58rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.choiceButton {
+  padding: 0.68rem 0.75rem;
+  border: 2px solid #2f261f;
+  background: #fff;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.choiceButton:hover {
+  background: #8a2b1a;
+  color: #fff;
+}
+
+.textButton {
+  margin-top: 0.75rem;
+  background: transparent;
+  border: 0;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.8rem;
+  color: #5d4c42;
+  cursor: pointer;
+}
+
+.textButton:hover {
+  color: var(--accent);
+}
+
+.pizzaSecretButton {
+  position: absolute;
+  top: -0.25rem;
+  right: -0.1rem;
+  border: 0;
+  background: transparent;
+  font-size: 1.3rem;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.24;
+  transition: opacity 0.2s ease;
+}
+
+.pizzaSecretButton:hover {
+  opacity: 1;
+}
+
+.pizzaUndoButton {
+  margin-top: 0.65rem;
+  background: linear-gradient(180deg, #fff2c9 0%, #ffe5b8 100%);
+  border: 2px solid #1e1e1e;
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.15), 0 0 0 2px #8a2b1a22;
+  text-transform: uppercase;
+  font-size: 0.78rem;
+  letter-spacing: 0.1em;
+  padding: 0.56rem 0.72rem;
+  text-decoration: none;
+}
+
+.pizzaUndoButton:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  text-decoration: line-through;
+}
+
+.pizzaUndoButton:hover:not(:disabled) {
+  background: linear-gradient(180deg, #d9c0a2 0%, #eabf89 100%);
+}
+
+.leaderboard {
+  margin-top: 0.8rem;
+  position: relative;
+  border: 2px solid #1e1e1e;
+  background: linear-gradient(180deg, #fff8ec 0%, #fcefd4 100%);
+  box-shadow: inset 0 0 0 1px #a47a58;
+  padding: 0.5rem 0.65rem 0.7rem;
+}
+
+.leaderboard::before {
+  content: "";
+  position: absolute;
+  inset: 0.28rem;
+  border: 1px dashed rgba(30, 30, 30, 0.2);
+  pointer-events: none;
+}
+
+.pizzaConfetti {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.pizzaSlice {
+  position: absolute;
+  top: -0.8rem;
+  opacity: 0;
+  animation-name: pizzaConfetti;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+  will-change: transform, opacity;
+  filter: drop-shadow(0 2px 2px rgba(30, 30, 30, 0.25));
+  transform-origin: center center;
+}
+
+@keyframes pizzaConfetti {
+  0% {
+    transform:
+      translate(0, -10vh)
+      rotate(var(--pizza-rotation, 0deg))
+      scale(0.75);
+    opacity: 0;
+  }
+  14% {
+    opacity: 1;
+  }
+  100% {
+    transform:
+      translate(0, 112vh)
+      rotate(
+        calc(var(--pizza-rotation, 0deg) + var(--pizza-spin, 0deg))
+      )
+      scale(1.05);
+    opacity: 0;
+  }
+}
+
+.scoreboardWrap {
+  margin-top: 0.55rem;
+  border-top: 2px solid #2f261f;
+  border-bottom: 2px solid #2f261f;
+  padding: 0.45rem 0.35rem 0.45rem 0.45rem;
+  display: grid;
+  gap: 0.25rem;
+  max-height: 420px;
+  overflow: auto;
+  background:
+    repeating-linear-gradient(
+      -45deg,
+      rgba(30, 30, 30, 0.06),
+      rgba(30, 30, 30, 0.06) 2px,
+      rgba(255, 255, 255, 0.12) 2px,
+      rgba(255, 255, 255, 0.12) 4px
+    ),
+    linear-gradient(180deg, #fffef9 0%, #fff3de 100%);
+}
+
+.scoreRow {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: baseline;
+  gap: 0.65rem;
+  padding: 0.38rem 0.45rem;
+  border-top: 1px dashed #b99a86;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.scoreRow:first-child {
+  border-top: 0;
+}
+
+.rankPill {
+  font-family: var(--font-display);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: 0.84rem;
+  color: #fff;
+  background: #8a2b1a;
+  border: 2px solid #2f261f;
+  width: 2.05rem;
+  text-align: center;
+  line-height: 1.45;
+  box-shadow: 0 2px 0 rgba(34, 16, 8, 0.35), 0 0 10px rgba(255, 40, 40, 0.15);
+  animation: arcadePulse 2.3s infinite;
+  transform: rotate(-1.5deg);
+}
+
+.scoreName {
+  color: #302219;
+  letter-spacing: 0.01em;
+}
+
+@keyframes arcadePulse {
+  0% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.08);
+  }
+  100% {
+    filter: brightness(1);
+  }
+}
+
+.footerButtons {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 620px) {
+  .userMenu {
+    padding: 0.75rem;
+  }
+
+  .decisionRow {
+    grid-template-columns: 1fr;
+  }
+}

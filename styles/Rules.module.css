@@ -1,0 +1,165 @@
+.page {
+  width: min(980px, 92vw);
+  margin: 1.2rem auto 2.5rem;
+}
+
+.card {
+  background: linear-gradient(180deg, #fff8e7 0%, #fff4db 100%);
+  border-left: 2px solid #8a2b1a;
+  border-top: 1px solid #6f2718;
+  border-right: 1px solid #cfbca6;
+  border-bottom: 2px solid #cfbca6;
+  padding: 1.2rem;
+  box-shadow: 0 10px 22px rgba(41, 28, 18, 0.12);
+}
+
+.badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent);
+  font-weight: 700;
+  margin-bottom: 0.4rem;
+  border-bottom: 1px dashed currentColor;
+  padding-bottom: 0.05rem;
+}
+
+.card h1 {
+  margin: 0 0 0.32rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-family: var(--font-display);
+}
+
+.subhead {
+  margin: 0 0 1rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.sliceGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.65rem;
+}
+
+.sliceCard {
+  position: relative;
+  border: 2px solid #6f2718;
+  border-radius: 12px;
+  padding: 0.75rem;
+  min-height: 0;
+  text-align: left;
+  font: inherit;
+  color: #3a2a1b;
+  background:
+    linear-gradient(180deg, #fff1da, #ffd8ab);
+  box-shadow: 0 5px 0 #c98a4c, inset 0 0 0 1px rgba(255, 255, 255, 0.45);
+  transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
+  overflow: hidden;
+}
+
+.sliceCard:hover {
+  transform: translateY(-1px);
+  border-color: #a73d2a;
+  box-shadow: 0 7px 0 #a73d2a;
+}
+
+.sliceCardHeader {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.sliceBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 999px;
+  background: #fff9f1;
+  border: 2px solid #6f2718;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.sliceBadgeButton {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  line-height: 1;
+  border-radius: 999px;
+}
+
+.sliceTitle {
+  font-size: 0.92rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #5e240f;
+  line-height: 1.15;
+}
+
+.sliceTrigger {
+  border: 1px solid #6f2718;
+  border-radius: 999px;
+  width: 1.65rem;
+  height: 1.65rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  font-size: 0.8rem;
+  cursor: pointer;
+  background: #fff6e9;
+  color: #5e240f;
+  padding: 0;
+  transition: transform 120ms ease, background 120ms ease;
+}
+
+.sliceTrigger:hover {
+  transform: scale(1.05);
+  background: #ffe4c0;
+}
+
+.sliceBody {
+  display: block;
+  color: #4b3525;
+  line-height: 1.5;
+  font-size: 0.9rem;
+  font-weight: 500;
+  margin: 0.55rem 0 0;
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(-4px);
+  overflow: hidden;
+  transition: max-height 140ms ease, opacity 140ms ease, transform 140ms ease, margin-top 140ms ease;
+}
+
+.sliceCardOpen {
+  border-color: #8a2b1a;
+  box-shadow: inset 0 0 0 2px #ffe5cc, 0 3px 0 #7e2b13;
+}
+
+.sliceCardOpen .sliceBody {
+  max-height: 180px;
+  opacity: 1;
+  transform: translateY(0);
+  margin-top: 0.5rem;
+}
+
+@media (max-width: 760px) {
+  .page {
+    width: min(980px, 94vw);
+  }
+
+  .sliceGrid {
+    grid-template-columns: 1fr;
+  }
+}
