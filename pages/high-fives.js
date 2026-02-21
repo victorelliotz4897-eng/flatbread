@@ -22,6 +22,7 @@ export default function HighFivesPage() {
 
   useEffect(() => {
     const configuredUsers = getConfiguredUsers().sort((left, right) => left.name.localeCompare(right.name));
+    const seenUserIds = new Set();
     const allPlaces = new Map(getAllPlaces().map((place) => [place.id, place]));
 
     const userRankings = configuredUsers
@@ -31,14 +32,38 @@ export default function HighFivesPage() {
           id: user.id,
           name: user.name,
           phase: snapshot?.phase,
+          totalPlaces: Number(snapshot?.totalPlaces) || 0,
           ranked: Array.isArray(snapshot?.ranked) ? snapshot.ranked : []
         };
       })
       .filter((entry) => entry.phase === "leaderboard" && entry.ranked.length > 0);
 
+    const cleanRankings = userRankings.filter((entry) => {
+      if (!entry.id || seenUserIds.has(entry.id)) {
+        return false;
+      }
+      if (!Number.isInteger(entry.totalPlaces) || entry.totalPlaces <= 0) {
+        return false;
+      }
+      seenUserIds.add(entry.id);
+      return true;
+    });
+
+    const totalPlaceCounts = new Map();
+    for (const entry of cleanRankings) {
+      const count = totalPlaceCounts.get(entry.totalPlaces) || [];
+      count.push(entry);
+      totalPlaceCounts.set(entry.totalPlaces, count);
+    }
+
+    const canonicalCount = [...totalPlaceCounts.keys()].sort((left, right) => right - left)[0] || 0;
+    const eligibleUsers = canonicalCount > 0
+      ? totalPlaceCounts.get(canonicalCount) || []
+      : [];
+
     const matchMap = new Map();
 
-    userRankings.forEach((entry) => {
+    eligibleUsers.forEach((entry) => {
       entry.ranked.forEach((place, rankIndex) => {
         if (!place?.id) {
           return;
@@ -169,4 +194,3 @@ export default function HighFivesPage() {
     </>
   );
 }
-

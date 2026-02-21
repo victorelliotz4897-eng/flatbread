@@ -95,12 +95,14 @@ export default function FlatbreadMap({ locations }) {
         const isClosedSpot = popupItem?.isClosed;
         const popupTitle = hasMultiple
           ? `<strong>${cluster.items.length} places</strong>`
-          : (isSecretGallerySpot ? "" : (isClosedSpot ? "<strong>Venue closed</strong>" : `<strong>${popupItem?.name || ""}</strong>`));
+          : (isSecretGallerySpot
+            ? ""
+            : (isClosedSpot ? "<strong>Graveyard</strong>" : `<strong>${popupItem?.name || ""}</strong>`));
         const galleryLink = popupItem?.galleryUrl
           ? `<p class="map-gallery-link-wrap"><a href="${popupItem.galleryUrl}" target="_blank" rel="noopener noreferrer">Make the Pizza</a></p>`
           : "";
         const tombstoneLink = isClosedSpot
-          ? `<p class="map-gallery-link-wrap"><a href="/tombstones">View closed venues</a></p>`
+          ? `<p class="map-gallery-link-wrap"><a href="/tombstones">Graveyard</a></p>`
           : "";
         const popupList = hasMultiple
           ? `<ul>${cluster.items
@@ -108,7 +110,7 @@ export default function FlatbreadMap({ locations }) {
               .join("")}</ul>`
           : (isSecretGallerySpot || isClosedSpot
             ? `${galleryLink}${tombstoneLink}`
-            : `<p>${popupItem?.date ? `${popupItem.date}<br/>` : ""}<small class="map-location">${popupItem?.address || ""}</small></p>${tombstoneLink}`);
+            : `<p>${popupItem?.date ? `${popupItem.date}<br/>` : ""}<small class="map-location">${popupItem?.address || ""}</small></p>`);
         const addressList = hasMultiple
           ? `<div class=\"map-cluster-address\">${cluster.items
               .map((item) => `<div><strong>${item.name}</strong><br/><small>${item.date}</small><small class=\"map-location\">${item.address}</small></div>`)
