@@ -1,0 +1,64 @@
+.page {
+  width: min(980px, 92vw);
+  margin: 1.4rem auto 2.2rem;
+  padding: 0 0 1rem;
+}
+
+.card {
+  background: linear-gradient(180deg, #fffdf8 0%, #fff5e4 100%);
+  border-left: 2px solid #7f240f;
+  border-top: 1px solid #5f1a10;
+  border-right: 1px solid #dbbd9f;
+  border-bottom: 2px solid #dbbd9f;
+  padding: 1.2rem;
+  box-shadow: 0 10px 24px rgba(38, 22, 14, 0.16);
+}
+
+.badge {
+  display: inline-block;
+  font-size: 0.74rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #7f240f;
+  font-weight: 700;
+  margin-bottom: 0.45rem;
+  border-bottom: 1px dashed currentColor;
+}
+
+.card h1 {
+  margin-top: 0.2rem;
+  margin-bottom: 0.35rem;
+}
+
+.lead {
+  margin: 0 0 0.85rem;
+  color: #5a4637;
+}
+
+.empty {
+  margin: 0.8rem 0;
+  color: #6f5b4b;
+}
+
+.listWrap {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.row {
+  border: 1px solid #e2cfb4;
+  border-left: 4px solid #7f240f;
+  padding: 0.65rem 0.78rem;
+  background: #fff;
+}
+
+.row h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.row p {
+  margin: 0.28rem 0 0;
+  color: #614b3d;
+  font-size: 0.92rem;
+}

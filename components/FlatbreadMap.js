@@ -10,16 +10,18 @@ const secretSpots = [
     lat: 40.6894,
     lng: -74.0166,
     galleryUrl: "/gallery",
-    isSecretGallery: true
+    isSecretGallery: true,
+    isClosed: false
   }
 ];
 
-function clusterPin(size, isCluster) {
+function clusterPin(size, isCluster, isClosed) {
+  const iconText = isClosed ? "🪦" : "🍕";
   return new L.DivIcon({
     className: isCluster ? "map-cluster-pin" : "map-pin",
     html: isCluster
-      ? `<span class="pizza-pin-glyph">🍕${size}</span>`
-      : "<span class=\"pizza-pin-glyph\">🍕</span>",
+      ? `<span class="pizza-pin-glyph">${iconText}${size}</span>`
+      : `<span class="pizza-pin-glyph">${iconText}</span>`,
     iconSize: isCluster ? [30, 30] : [22, 22],
     iconAnchor: isCluster ? [15, 15] : [11, 11]
   });
@@ -31,7 +33,20 @@ function clusterLocations(locations) {
   const grouped = [];
 
   for (const location of locations) {
+    if (location.isClosed || location.isSecretGallery) {
+      grouped.push({
+        lat: location.lat,
+        lng: location.lng,
+        anchor: location,
+        items: [location]
+      });
+      continue;
+    }
+
     const existing = grouped.find((group) => {
+      if (group.anchor.isClosed || group.anchor.isSecretGallery) {
+        return false;
+      }
       const latDiff = Math.abs(group.lat - location.lat);
       const lngDiff = Math.abs(group.lng - location.lng);
       return latDiff < CLUSTER_DISTANCE && lngDiff < CLUSTER_DISTANCE;
@@ -77,17 +92,23 @@ export default function FlatbreadMap({ locations }) {
         const hasMultiple = cluster.items.length > 1;
         const popupItem = !hasMultiple ? cluster.items[0] : null;
         const isSecretGallerySpot = popupItem?.isSecretGallery && popupItem?.galleryUrl;
+        const isClosedSpot = popupItem?.isClosed;
         const popupTitle = hasMultiple
           ? `<strong>${cluster.items.length} places</strong>`
-          : (isSecretGallerySpot ? "" : `<strong>${popupItem?.name || ""}</strong>`);
+          : (isSecretGallerySpot ? "" : (isClosedSpot ? "<strong>Venue closed</strong>" : `<strong>${popupItem?.name || ""}</strong>`));
         const galleryLink = popupItem?.galleryUrl
           ? `<p class="map-gallery-link-wrap"><a href="${popupItem.galleryUrl}" target="_blank" rel="noopener noreferrer">Make the Pizza</a></p>`
+          : "";
+        const tombstoneLink = isClosedSpot
+          ? `<p class="map-gallery-link-wrap"><a href="/tombstones">View closed venues</a></p>`
           : "";
         const popupList = hasMultiple
           ? `<ul>${cluster.items
               .map((item) => `<li>${item.name}<br/><small>${item.date}</small></li>`)
               .join("")}</ul>`
-          : (isSecretGallerySpot ? galleryLink : `<p>${popupItem?.date ? `${popupItem.date}<br/>` : ""}<small class="map-location">${popupItem?.address || ""}</small></p>${galleryLink}`);
+          : (isSecretGallerySpot || isClosedSpot
+            ? `${galleryLink}${tombstoneLink}`
+            : `<p>${popupItem?.date ? `${popupItem.date}<br/>` : ""}<small class="map-location">${popupItem?.address || ""}</small></p>${tombstoneLink}`);
         const addressList = hasMultiple
           ? `<div class=\"map-cluster-address\">${cluster.items
               .map((item) => `<div><strong>${item.name}</strong><br/><small>${item.date}</small><small class=\"map-location\">${item.address}</small></div>`)
@@ -98,7 +119,7 @@ export default function FlatbreadMap({ locations }) {
           <Marker
             key={`${cluster.lat}-${cluster.lng}-${index}`}
             position={[cluster.anchor.lat, cluster.anchor.lng]}
-            icon={clusterPin(cluster.items.length, hasMultiple)}
+            icon={clusterPin(cluster.items.length, hasMultiple, isClosedSpot)}
           >
             <Popup>
               <div

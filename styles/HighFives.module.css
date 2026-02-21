@@ -1,0 +1,198 @@
+.page {
+  width: min(980px, 92vw);
+  margin: 1rem auto 2rem;
+}
+
+.panel {
+  background: linear-gradient(180deg, #fffaf0 0%, #fff9eb 100%);
+  border: 2px solid #8a2b1a;
+  border-left-width: 3px;
+  padding: 1rem;
+  box-shadow: 0 10px 22px rgba(41, 28, 18, 0.12);
+}
+
+.badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent);
+  font-weight: 700;
+  margin-bottom: 0.45rem;
+  border-bottom: 1px dashed currentColor;
+}
+
+.panel h1 {
+  margin-top: 0;
+}
+
+.lead {
+  margin: 0.2rem 0 0.8rem;
+  color: #5e4f43;
+}
+
+.empty {
+  margin: 0;
+  color: #5d4f45;
+}
+
+.matchList {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.matchCard {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.68rem;
+  align-items: center;
+  padding: 0.68rem 0.75rem;
+  background: #fffdf6;
+  border: 2px solid #2f261f;
+  border-left: 4px solid #8a2b1a;
+  cursor: pointer;
+  text-align: left;
+}
+
+.matchCard:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(48, 31, 18, 0.14);
+}
+
+.rankBadge {
+  width: 2.2rem;
+  height: 2.2rem;
+  margin: 0;
+  display: grid;
+  place-items: center;
+  border: 2px solid #2f261f;
+  font-size: 0.82rem;
+  font-weight: 800;
+  font-family: var(--font-display);
+  color: #2f261f;
+  background: linear-gradient(180deg, #fffef6, #f4debf);
+}
+
+.matchCopy {
+  display: grid;
+  gap: 0.16rem;
+}
+
+.matchName {
+  margin: 0;
+  font-size: 1rem;
+  letter-spacing: 0.02em;
+  font-weight: 700;
+  color: #2d221d;
+}
+
+.matchDate {
+  margin: 0;
+  color: #5e4f45;
+  font-size: 0.82rem;
+}
+
+.matchUsers {
+  margin: 0;
+  color: #634c3f;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+  letter-spacing: 0.07em;
+}
+
+.cheer {
+  font-size: 1.22rem;
+}
+
+.highFiveOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.highFiveCard {
+  border: 2px solid #2f261f;
+  background: linear-gradient(180deg, #fff6de 0%, #f8e0b8 100%);
+  padding: 0.9rem 1rem;
+  text-align: center;
+  box-shadow: 0 12px 24px rgba(40, 28, 18, 0.26);
+  animation: highFivePop 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.highFiveTitle {
+  margin: 0;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: #7a3018;
+  font-size: 0.8rem;
+}
+
+.highFiveTarget {
+  margin: 0.5rem 0 0;
+  display: grid;
+  gap: 0.2rem;
+  color: #261f18;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.highFiveTarget span {
+  font-size: 0.84rem;
+  opacity: 0.8;
+}
+
+.highFiveUsers {
+  margin: 0.5rem 0 0;
+  color: #5b4b41;
+  font-size: 0.84rem;
+}
+
+.highFiveEmoji {
+  position: absolute;
+  font-size: 2rem;
+  left: 20%;
+  animation: highFiveEmoji 1.7s ease-in forwards;
+}
+
+.highFiveEmoji:nth-child(2) {
+  left: 50%;
+  top: 15%;
+}
+
+.highFiveEmoji:nth-child(3) {
+  left: 75%;
+  top: 18%;
+}
+
+@keyframes highFivePop {
+  from {
+    transform: translateY(-8px) scale(0.96);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes highFiveEmoji {
+  0% {
+    opacity: 0;
+    transform: translateY(-25px) scale(0.8) rotate(-8deg);
+  }
+
+  20% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(170px) scale(1.08) rotate(18deg);
+  }
+}

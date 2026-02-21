@@ -176,6 +176,13 @@
   font-size: 0.8rem;
 }
 
+.placeRowActions {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
 .textButton {
   margin-top: 0.7rem;
   background: transparent;

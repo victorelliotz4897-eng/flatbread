@@ -5,6 +5,7 @@ const SCHEMA_VERSION = 1;
 const RANKING_SYNC_ENDPOINT = "/api/rankings";
 const TEST_USER_LIST_KEY = "flatbread-test-user-accounts-v1";
 const USER_PASSWORDS_KEY = "flatbread-user-passwords-v1";
+const PLACE_STATE_CLOSED_KEY = "closedPlaceIds";
 
 const DEFAULT_USER_PASSWORDS = {
   victor: "robertas",
@@ -171,12 +172,28 @@ function normalizeUndoPoint(point) {
 }
 
 function normalizeUndoStack(list) {
-  if (!Array.isArray(list)) return [];
-  return list.map(normalizeUndoPoint).filter(Boolean);
+  const safeList = normalizeList(list);
+  if (!Array.isArray(safeList)) {
+    return [];
+  }
+  return safeList.map(normalizeUndoPoint).filter(Boolean);
 }
 
 function normalizeList(value) {
-  return Array.isArray(value) ? value : [];
+  if (Array.isArray(value)) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+
+  return [];
 }
 
 function safeString(value) {
@@ -194,6 +211,20 @@ function normalizeStringList(value) {
   return Array.isArray(value)
     ? value.map((item) => safeString(item)).filter(Boolean)
     : [];
+}
+
+function normalizePlaceIdList(value) {
+  const values = normalizeList(value);
+  const seen = new Set();
+  return values
+    .map((entry) => safeString(entry))
+    .filter((entry) => {
+      if (!entry || seen.has(entry)) {
+        return false;
+      }
+      seen.add(entry);
+      return true;
+    });
 }
 
 function safeClone(value) {
@@ -509,7 +540,8 @@ function baseState() {
     version: SCHEMA_VERSION,
     users,
     places: {
-      custom: []
+      custom: [],
+      [PLACE_STATE_CLOSED_KEY]: []
     }
   };
 }
@@ -545,9 +577,18 @@ function getStorageState() {
       user.session = normalizeSessionState(user.session);
     });
     merged.places = {
-      custom: Array.isArray(parsed.places?.custom) ? parsed.places.custom : []
+      custom: Array.isArray(parsed.places?.custom) ? parsed.places.custom : [],
+      [PLACE_STATE_CLOSED_KEY]: Array.isArray(parsed.places?.[PLACE_STATE_CLOSED_KEY])
+        ? normalizePlaceIdList(parsed.places[PLACE_STATE_CLOSED_KEY])
+        : []
     };
     merged.version = parsed.version || SCHEMA_VERSION;
+
+    const allPlaces = allChronologicalPlaces(merged);
+    const validPlaceIds = new Set(allPlaces.map((place) => place.id));
+    merged.places[PLACE_STATE_CLOSED_KEY] = merged.places[PLACE_STATE_CLOSED_KEY].filter((id) =>
+      validPlaceIds.has(id)
+    );
     return merged;
   } catch (error) {
     return baseState();
@@ -659,6 +700,7 @@ function nextUnrankedPlace(allPlaces, user) {
 
 function allChronologicalPlaces(state) {
   const custom = Array.isArray(state.places?.custom) ? state.places.custom : [];
+  const closedSet = new Set(normalizePlaceIdList(state.places?.[PLACE_STATE_CLOSED_KEY]));
   const staticPlaces = flatbreadLocations.map(hydrateBasePlace);
   const customPlaces = custom.map(sanitizePlace).map(hydrateCustomPlace);
 
@@ -669,7 +711,10 @@ function allChronologicalPlaces(state) {
       continue;
     }
     seen.add(place.id);
-    places.push(place);
+    places.push({
+      ...place,
+      isClosed: closedSet.has(place.id)
+    });
   }
 
   return places.sort((a, b) => a.visitDate - b.visitDate);
@@ -1005,6 +1050,54 @@ function userNameForId(userId) {
 export function getAllPlaces() {
   const state = getStorageState();
   return allChronologicalPlaces(state);
+}
+
+export function getClosedPlaces() {
+  const state = getStorageState();
+  return allChronologicalPlaces(state).filter((place) => place.isClosed);
+}
+
+export function togglePlaceClosedState(placeId) {
+  const state = getStorageState();
+  const id = safeString(placeId);
+  if (!id) {
+    return {
+      updated: false,
+      isClosed: false,
+      message: "Missing place."
+    };
+  }
+
+  const allPlaces = allChronologicalPlaces(state);
+  const validSet = new Set(allPlaces.map((place) => place.id));
+  if (!validSet.has(id)) {
+    return {
+      updated: false,
+      isClosed: false,
+      message: "Place not found."
+    };
+  }
+
+  const current = new Set(normalizePlaceIdList(state.places?.[PLACE_STATE_CLOSED_KEY]));
+  if (current.has(id)) {
+    current.delete(id);
+    state.places[PLACE_STATE_CLOSED_KEY] = Array.from(current);
+    saveState(state);
+    return {
+      updated: true,
+      isClosed: false,
+      placeId: id
+    };
+  }
+
+  current.add(id);
+  state.places[PLACE_STATE_CLOSED_KEY] = Array.from(current);
+  saveState(state);
+  return {
+    updated: true,
+    isClosed: true,
+    placeId: id
+  };
 }
 
 export function getRankingSession(userId) {

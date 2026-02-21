@@ -10,7 +10,8 @@ import {
   setPasswordForUser,
   getUsersPendingCounts,
   removeTestUser,
-  resetAllRankings
+  resetAllRankings,
+  togglePlaceClosedState
 } from "../utils/rankingStore";
 import styles from "../styles/Admin.module.css";
 import { LANDING_GAME_KEY as ADMIN_LANDING_GAME_KEY } from "../data/config";
@@ -389,6 +390,16 @@ export default function AdminPage() {
     setMessage(`Added ${result.place?.name} and queued it for all users.`);
     setForm(DEFAULT_FORM);
     resetFormAddressState();
+    refresh();
+  };
+
+  const onTogglePlaceClosed = (placeId) => {
+    const result = togglePlaceClosedState(placeId);
+    if (!result?.updated) {
+      setMessage(result?.message || "Could not update place status.");
+      return;
+    }
+    setMessage(result.isClosed ? "Place marked as closed." : "Place reopened.");
     refresh();
   };
 
@@ -793,6 +804,20 @@ export default function AdminPage() {
                 <strong>{place.name}</strong>
                 <span>{place.date}</span>
                 <small>{place.address}</small>
+                <div className={styles.placeRowActions}>
+                  {place.isClosed ? (
+                    <span className={styles.userMeta}>status: closed</span>
+                  ) : (
+                    <span className={styles.userMeta}>status: active</span>
+                  )}
+                  <button
+                    type="button"
+                    className={styles.textButton}
+                    onClick={() => onTogglePlaceClosed(place.id)}
+                  >
+                    {place.isClosed ? "Reopen this venue" : "Mark as closed"}
+                  </button>
+                </div>
               </article>
             ))}
           </div>

@@ -10,87 +10,11 @@ import {
   submitRankingChoice,
   undoLastRankingChoice
 } from "../utils/rankingStore";
+import { getPlaceHintText } from "../utils/placeCallouts";
 import styles from "../styles/Rankings.module.css";
 
 function formatPlaceLine(place) {
   return place?.name || "";
-}
-
-const PLACE_HINTS = {
-  "ignazio's": "Half circle, half square pie.",
-  "zazzy's pizza": "This one usually belongs right at the bottom.",
-  "roberta's": "Somebody forgot to cut this one. 🥃",
-  sauce: "Jack Sasson, try keeping this one in the middle now.",
-  "regular sauce": "Jack Sasson, try keeping this one in the middle now.",
-  "sauce restaurant": "Jack Sasson, try keeping this one in the middle now.",
-  "regaulr sauce": "Jack Sasson, try keeping this one in the middle now.",
-  "lazzara's pizza cafe": "Lunchables",
-  "unregular pizza": "Wasn't this a bakery?",
-  "the galley pizza & eatery": "You didn't have to ride 60 miles to enjoy this one.",
-  "the galley": "You didn't have to ride 60 miles to enjoy this one.",
-  "totonno's": "You might feel a little high, but the pizza stays sharp.",
-  lucali: "There were no banana peppers!",
-  "beach haus brewery": "🦵🦽🦿",
-  "chrissy's pizza": "⚾ but you probabaly don't remember this one",
-  ops: "\"Don't shoo me off.\"",
-  "grimaldi's pizzeria": "🍃💸 Basil Surcharge",
-  "grimaldi's": "🍃💸 Basil Surcharge",
-  "nolita pizza": "A little tourist trap.",
-  ribalta: "🍜",
-  "arturo's coal oven pizza": "There may not have been flavor, but there were vibes. 🎵",
-  "john's of bleecker street": "❄️ @Jack Dweck",
-  "giuseppina's": "Giuseppeeeeeeeeeeeeeeena's",
-  "paulie gee's": "Hot honey @Aaron",
-  macoletta: "The least memorable pizza of all time.",
-  "sea bright pizzeria": "Domino's",
-  "juliana's": "RIP",
-  "giuliana's": "RIP",
-  "see no evil pizza": "pornhub.com/jacksasson"
-};
-
-function normalizePlaceForHint(text) {
-  return String(text || "")
-    .toLowerCase()
-    .normalize("NFKC")
-    .replace(/[\u2018\u2019]/g, "'")
-    .replace(/[^\w\s&']/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function normalizePlaceKey(text) {
-  return String(text || "")
-    .toLowerCase()
-    .normalize("NFKC")
-    .replace(/[\u2018\u2019]/g, "")
-    .replace(/[^a-z0-9]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-const PLACE_HINT_ENTRIES = Object.fromEntries(
-  Object.entries(PLACE_HINTS).map(([name, hint]) => [normalizePlaceKey(name), hint])
-);
-
-function getPlaceHint(name) {
-  const normalized = normalizePlaceKey(name);
-  if (!normalized) return "";
-
-  if (PLACE_HINT_ENTRIES[normalized]) {
-    return PLACE_HINT_ENTRIES[normalized];
-  }
-
-  for (const [hintKey, hint] of Object.entries(PLACE_HINT_ENTRIES)) {
-    if (normalized.includes(hintKey) || hintKey.includes(normalized)) {
-      return hint;
-    }
-  }
-
-  if (/\bsauce\b/.test(normalized)) {
-    return "Jack Sasson, try keeping this one in the middle now.";
-  }
-
-  return "";
 }
 
 function renderChronologicalPreview(ranked) {
@@ -234,10 +158,8 @@ export default function RankingsPage() {
       setCurrentHint("");
       return;
     }
-    const currentName = normalizePlaceForHint(snapshot.currentPlace?.name);
-    const directHint = PLACE_HINTS[currentName];
-    const fallbackHint = getPlaceHint(snapshot.currentPlace?.name);
-    setCurrentHint(directHint || fallbackHint || "");
+    const fallbackHint = getPlaceHintText(snapshot.currentPlace?.name);
+    setCurrentHint(fallbackHint || "");
   }, [snapshot?.currentPlace?.id, snapshot?.mode, snapshot?.phase]);
 
   return (

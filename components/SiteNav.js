@@ -71,6 +71,14 @@ export default function SiteNav({ places = [] }) {
               <span aria-hidden>🍕</span>
               <span>Rankings</span>
             </Link>
+            <Link href="/high-fives" prefetch={false} onClick={closeMenu}>
+              <span aria-hidden>🤜</span>
+              <span>High Fives</span>
+            </Link>
+            <Link href="/honor" prefetch={false} onClick={closeMenu}>
+              <span aria-hidden>🍕</span>
+              <span>Honor</span>
+            </Link>
           </nav>
         </div>
       </div>
