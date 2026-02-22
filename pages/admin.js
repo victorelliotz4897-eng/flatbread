@@ -7,6 +7,7 @@ import {
   addTestUser,
   getAllPlaces,
   getConfiguredUsersWithPasswords,
+  getRankingSession,
   setPasswordForUser,
   getUsersPendingCounts,
   removeTestUser,
@@ -51,6 +52,24 @@ const LANDING_GAME_KEYS_TO_RESET = [
   "flatbread-landing-game-v3",
   "flatbread-landing-game-v2"
 ];
+
+const ADMIN_TABS = [
+  { id: "rankings", label: "Rankings", icon: "🍕" },
+  { id: "places", label: "Places", icon: "🍕" },
+  { id: "photos", label: "Photos", icon: "🍕" },
+  { id: "seats", label: "Seats", icon: "🍕" },
+  { id: "settings", label: "Settings", icon: "🍕" }
+];
+
+function getAllPlacesLengthSafe(snapshot, fallbackPlaces) {
+  if (Number.isFinite(snapshot?.totalPlaces) && snapshot.totalPlaces > 0) {
+    return snapshot.totalPlaces;
+  }
+  if (Array.isArray(snapshot?.ranked) && Number.isFinite(snapshot.ranked.length)) {
+    return snapshot.ranked.length;
+  }
+  return Array.isArray(fallbackPlaces) ? fallbackPlaces.length : 0;
+}
 
 function addressOptionsFromNominatim(results) {
   if (!Array.isArray(results)) return [];
@@ -98,6 +117,8 @@ export default function AdminPage() {
   const [placeCalloutDrafts, setPlaceCalloutDrafts] = useState({});
   const [placeOrderMessage, setPlaceOrderMessage] = useState("");
   const [placeOrderDrafts, setPlaceOrderDrafts] = useState({});
+  const [rankingColumns, setRankingColumns] = useState([]);
+  const [activeTab, setActiveTab] = useState("rankings");
   const addressTimerRef = useRef(null);
   const triggerLandingGame = () => {
     if (typeof window === "undefined") {
@@ -116,6 +137,24 @@ export default function AdminPage() {
       setPendingUsers(getUsersPendingCounts());
       const usersWithPasswords = getConfiguredUsersWithPasswords();
       setConfiguredUsers(usersWithPasswords);
+      const nextRankingColumns = usersWithPasswords.map((user) => {
+        const snapshot = getRankingSession(user.id);
+        const rankedPlaces = Array.isArray(snapshot?.ranked)
+          ? snapshot.ranked.map((place, index) => ({
+              id: place.id || `${user.id}-${index}`,
+              name: place.name || "Unknown place",
+              date: place.date || "",
+              rank: index + 1
+            }))
+          : [];
+        return {
+          id: user.id,
+          name: user.name,
+          total: Number(snapshot?.totalPlaces) || allPlacesLengthSafe(snapshot, nextPlaces),
+          ranked: rankedPlaces
+        };
+      });
+      setRankingColumns(nextRankingColumns);
       setUserPasswordInputs((previous) => {
         const next = { ...previous };
         usersWithPasswords.forEach((user) => {
@@ -140,6 +179,7 @@ export default function AdminPage() {
       setPlaces([]);
       setConfiguredUsers([]);
       setPendingUsers([]);
+      setRankingColumns([]);
       setLoadError("Admin dashboard could not load stored rankings. Use reset all results or clear local storage.");
     }
   };
@@ -618,353 +658,424 @@ export default function AdminPage() {
       </Head>
       <SiteNav />
       <main className={styles.page}>
-        <section className={styles.panel}>
-          <p className={styles.badge}>Admin</p>
-          <h1>Add Flatbread Place</h1>
-            <p className={styles.help}>
-            Add a new spot to trigger ranking insertion.
-          </p>
-          {loadError ? <p className={styles.message}>{loadError}</p> : null}
-
-          <form className={styles.form} onSubmit={onSubmit}>
-            <label>
-              Name
-              <input name="name" value={form.name} onChange={onInput} required />
-            </label>
-            <label>
-              Month
-              <select name="month" value={form.month} onChange={onInput} required>
-                {MONTHS.map((month) => (
-                  <option key={month} value={month}>{month}</option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Year
-              <select name="year" value={form.year} onChange={onInput} required>
-                {Array.from({ length: MAX_YEAR - MIN_YEAR + 1 }, (_, index) => {
-                  const year = String(MIN_YEAR + index);
-                  return (
-                    <option key={year} value={year}>
-                      {year}
-                    </option>
-                  );
-                })}
-              </select>
-            </label>
-            <label>
-              Address
-              <input
-                name="address"
-                value={form.address}
-                onChange={onAddressInput}
-                autoComplete="off"
-                placeholder="Type an address"
-                required
-              />
-              <a
-                href={form.address ? `https://www.google.com/maps/search/${encodeURIComponent(form.address)}` : "https://www.google.com/maps"}
-                target="_blank"
-                rel="noreferrer noopener"
-                className={styles.googleLink}
+        <section className={styles.tabMenu} role="navigation" aria-label="Admin sections">
+          <div className={styles.tabList}>
+            {ADMIN_TABS.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                className={`${styles.tabButton} ${activeTab === tab.id ? styles.tabButtonActive : ""}`}
+                onClick={() => setActiveTab(tab.id)}
               >
-                Open in Google Maps
-              </a>
-              {isSearchingAddress ? <p className={styles.help}>Searching addresses...</p> : null}
-              {addressLookupStatus ? <p className={styles.authError}>{addressLookupStatus}</p> : null}
-              {addressResults.length > 0 ? (
-                <ul className={styles.addressList}>
-                  {addressResults.map((item) => (
-                    <li
-                      key={item.id}
-                      className={styles.addressItem}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => onAddressPick(item)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter" || event.key === " ") {
-                          event.preventDefault();
-                          onAddressPick(item);
-                        }
-                      }}
-                    >
-                      {item.label}
-                    </li>
-                  ))}
-              </ul>
-            ) : null}
-            </label>
-            <button type="submit">Add place</button>
-          </form>
-          {message ? <p className={styles.message}>{message}</p> : null}
-          <button
-            type="button"
-            className={styles.textButton}
-            onClick={resetAllResults}
-          >
-            Reset all results
-          </button>
-          <button
-            type="button"
-            className={styles.textButton}
-            onClick={triggerLandingGame}
-          >
-            Trigger landing game for next visit
-          </button>
-          <button type="button" className={styles.textButton} onClick={lockAdmin}>
-            Lock admin
-          </button>
+                <span className={styles.tabIcon} aria-hidden="true">{tab.icon}</span>
+                <span>{tab.label}</span>
+              </button>
+            ))}
+          </div>
         </section>
 
-        <section className={styles.panel}>
-          <p className={styles.badge}>Gallery</p>
-          <p className={styles.help}>Upload photos to the Governor's Island secret spot gallery.</p>
-          {galleryConfigMessage ? <p className={styles.warning}>{galleryConfigMessage}</p> : null}
-          {galleryStatus ? <p className={styles.message}>{galleryStatus}</p> : null}
-          <div className={isGalleryConfigured ? undefined : styles.galleryDisabledNotice}>
-            <form className={styles.form} onSubmit={onGallerySubmit}>
-              <label>
-                Gallery photo
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(event) => setGalleryFile(event.target.files?.[0] || null)}
-                  disabled={!isGalleryConfigured}
-                />
-              </label>
-              <label>
-                Caption
-                <input
-                  value={galleryCaption}
-                  onChange={(event) => setGalleryCaption(event.target.value)}
-                  placeholder="Optional caption"
-                  autoComplete="off"
-                  disabled={!isGalleryConfigured}
-                />
-              </label>
-              <button
-                type="submit"
-                disabled={isUploadingPhoto || !isGalleryConfigured}
-              >
-                {isUploadingPhoto ? "Uploading..." : "Upload photo"}
-              </button>
-            </form>
-            {galleryItems.length ? (
-              <ul className={styles.galleryList}>
-                {galleryItems.map((item, index) => (
-                  <li key={item.pathname || item.src} className={styles.galleryItem}>
-                    <img
-                      src={item.src}
-                      alt={item.alt || `Gallery photo ${index + 1}`}
-                      className={styles.galleryThumb}
-                    />
-                    <div className={styles.galleryMeta}>
-                      <small>{item.pathname || item.alt}</small>
+        {activeTab === "settings" && (
+          <section className={styles.panel}>
+            <p className={styles.badge}>Admin</p>
+            <h1>Admin Settings</h1>
+            <p className={styles.help}>
+              Admin actions and app controls.
+            </p>
+            {loadError ? <p className={styles.message}>{loadError}</p> : null}
+            <button
+              type="button"
+              className={styles.textButton}
+              onClick={resetAllResults}
+            >
+              Reset all results
+            </button>
+            <button
+              type="button"
+              className={styles.textButton}
+              onClick={triggerLandingGame}
+            >
+              Trigger landing game for next visit
+            </button>
+            <button type="button" className={styles.textButton} onClick={lockAdmin}>
+              Lock admin
+            </button>
+          </section>
+        )}
+
+        {activeTab === "places" && (
+          <>
+            <section className={styles.panel}>
+              <p className={styles.badge}>Admin</p>
+              <h1>Add Flatbread Place</h1>
+              <p className={styles.help}>
+                Add a new spot to trigger ranking insertion.
+              </p>
+              <form className={styles.form} onSubmit={onSubmit}>
+                <label>
+                  Name
+                  <input name="name" value={form.name} onChange={onInput} required />
+                </label>
+                <label>
+                  Month
+                  <select name="month" value={form.month} onChange={onInput} required>
+                    {MONTHS.map((month) => (
+                      <option key={month} value={month}>{month}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Year
+                  <select name="year" value={form.year} onChange={onInput} required>
+                    {Array.from({ length: MAX_YEAR - MIN_YEAR + 1 }, (_, index) => {
+                      const year = String(MIN_YEAR + index);
+                      return (
+                        <option key={year} value={year}>
+                          {year}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </label>
+                <label>
+                  Address
+                  <input
+                    name="address"
+                    value={form.address}
+                    onChange={onAddressInput}
+                    autoComplete="off"
+                    placeholder="Type an address"
+                    required
+                  />
+                  <a
+                    href={form.address ? `https://www.google.com/maps/search/${encodeURIComponent(form.address)}` : "https://www.google.com/maps"}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className={styles.googleLink}
+                  >
+                    Open in Google Maps
+                  </a>
+                  {isSearchingAddress ? <p className={styles.help}>Searching addresses...</p> : null}
+                  {addressLookupStatus ? <p className={styles.authError}>{addressLookupStatus}</p> : null}
+                  {addressResults.length > 0 ? (
+                    <ul className={styles.addressList}>
+                      {addressResults.map((item) => (
+                        <li
+                          key={item.id}
+                          className={styles.addressItem}
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => onAddressPick(item)}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter" || event.key === " ") {
+                              event.preventDefault();
+                              onAddressPick(item);
+                            }
+                          }}
+                        >
+                          {item.label}
+                        </li>
+                      ))}
+                  </ul>
+                ) : null}
+                </label>
+                <button type="submit">Add place</button>
+              </form>
+              {message ? <p className={styles.message}>{message}</p> : null}
+            </section>
+
+            <section className={styles.panel}>
+              <p className={styles.badge}>Places</p>
+              {placeCalloutMessage ? <p className={styles.message}>{placeCalloutMessage}</p> : null}
+              {placeOrderMessage ? <p className={styles.message}>{placeOrderMessage}</p> : null}
+              <div className={styles.placeList}>
+                {places.map((place) => (
+                  <article key={place.id} className={styles.placeRow}>
+                    <strong>{place.name}</strong>
+                    <span>{place.date}</span>
+                    <small>{place.address}</small>
+                    <div className={styles.placeRowActions}>
+                      {place.isClosed ? (
+                        <span className={styles.userMeta}>status: closed</span>
+                      ) : (
+                        <span className={styles.userMeta}>status: active</span>
+                      )}
+                      <label className={styles.placeHostRow}>
+                        Chosen by
+                        <select
+                          value={place.hostUserId || ""}
+                          onChange={(event) => onPlaceHostChange(place.id, event.target.value)}
+                          className={styles.placeHostSelect}
+                        >
+                          <option value="">— Unassigned —</option>
+                          <option value="all">All</option>
+                          {configuredUsers.map((user) => (
+                            <option key={`host-${place.id}-${user.id}`} value={user.id}>
+                              {user.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <button
+                        type="button"
+                        className={styles.textButton}
+                        onClick={() => onTogglePlaceClosed(place.id)}
+                      >
+                        {place.isClosed ? "Reopen this venue" : "Mark as closed"}
+                      </button>
                     </div>
-                    <div className={styles.galleryActions}>
-                      <button
-                        type="button"
-                        className={styles.textButton}
-                        onClick={() => onMoveGalleryItem(index, "up")}
-                        disabled={index === 0 || isGalleryBusy || !isGalleryConfigured || !item.pathname}
-                      >
-                        Up
+                    <label className={styles.placeCalloutRowLabel}>
+                      Honor joke
+                      <textarea
+                        className={styles.placeCalloutTextArea}
+                        value={placeCalloutDrafts[place.id] || ""}
+                        onChange={(event) => onCalloutInputChange(place.id, event.target.value)}
+                        rows={2}
+                        placeholder="Add/edit joke for this place"
+                      />
+                    </label>
+                    <div className={styles.placeCalloutActions}>
+                      <button type="button" onClick={() => onSavePlaceCallout(place)}>
+                        Save
                       </button>
-                      <button
-                        type="button"
-                        className={styles.textButton}
-                        onClick={() => onMoveGalleryItem(index, "down")}
-                        disabled={index === galleryItems.length - 1 || isGalleryBusy || !isGalleryConfigured || !item.pathname}
-                      >
-                        Down
+                      {Boolean(getCustomPlaceHint(place.name)) ? (
+                        <button
+                          type="button"
+                          className={styles.textButton}
+                          onClick={() => onDeletePlaceCallout(place)}
+                        >
+                          Remove
+                        </button>
+                      ) : null}
+                    </div>
+                    <label className={styles.placeOrderRowLabel}>
+                      What we ordered
+                      <textarea
+                        className={styles.placeOrderTextArea}
+                        value={placeOrderDrafts[place.id] || ""}
+                        onChange={(event) => onOrderInputChange(place.id, event.target.value)}
+                        rows={2}
+                        placeholder="Add/edit what we ordered"
+                      />
+                    </label>
+                    <div className={styles.placeCalloutActions}>
+                      <button type="button" onClick={() => onSavePlaceOrder(place)}>
+                        Save order
                       </button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </section>
+          </>
+        )}
+
+        {activeTab === "photos" && (
+          <section className={styles.panel}>
+            <p className={styles.badge}>Gallery</p>
+            <p className={styles.help}>Upload photos to the Governor's Island secret spot gallery.</p>
+            {galleryConfigMessage ? <p className={styles.warning}>{galleryConfigMessage}</p> : null}
+            {galleryStatus ? <p className={styles.message}>{galleryStatus}</p> : null}
+            <div className={isGalleryConfigured ? undefined : styles.galleryDisabledNotice}>
+              <form className={styles.form} onSubmit={onGallerySubmit}>
+                <label>
+                  Gallery photo
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(event) => setGalleryFile(event.target.files?.[0] || null)}
+                    disabled={!isGalleryConfigured}
+                  />
+                </label>
+                <label>
+                  Caption
+                  <input
+                    value={galleryCaption}
+                    onChange={(event) => setGalleryCaption(event.target.value)}
+                    placeholder="Optional caption"
+                    autoComplete="off"
+                    disabled={!isGalleryConfigured}
+                  />
+                </label>
+                <button
+                  type="submit"
+                  disabled={isUploadingPhoto || !isGalleryConfigured}
+                >
+                  {isUploadingPhoto ? "Uploading..." : "Upload photo"}
+                </button>
+              </form>
+              {galleryItems.length ? (
+                <ul className={styles.galleryList}>
+                  {galleryItems.map((item, index) => (
+                    <li key={item.pathname || item.src} className={styles.galleryItem}>
+                      <img
+                        src={item.src}
+                        alt={item.alt || `Gallery photo ${index + 1}`}
+                        className={styles.galleryThumb}
+                      />
+                      <div className={styles.galleryMeta}>
+                        <small>{item.pathname || item.alt}</small>
+                      </div>
+                      <div className={styles.galleryActions}>
+                        <button
+                          type="button"
+                          className={styles.textButton}
+                          onClick={() => onMoveGalleryItem(index, "up")}
+                          disabled={index === 0 || isGalleryBusy || !isGalleryConfigured || !item.pathname}
+                        >
+                          Up
+                        </button>
+                        <button
+                          type="button"
+                          className={styles.textButton}
+                          onClick={() => onMoveGalleryItem(index, "down")}
+                          disabled={index === galleryItems.length - 1 || isGalleryBusy || !isGalleryConfigured || !item.pathname}
+                        >
+                          Down
+                        </button>
+                        <button
+                          type="button"
+                          className={styles.textButton}
+                          onClick={() => onDeleteGalleryItem(item)}
+                          disabled={isGalleryBusy || !isGalleryConfigured || !item.pathname}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className={styles.help}>No uploaded photos yet.</p>
+              )}
+            </div>
+          </section>
+        )}
+
+        {activeTab === "rankings" && (
+          <>
+            <section className={styles.panel}>
+              <p className={styles.badge}>Pending insertions</p>
+              <ul className={styles.pendingList}>
+                {pendingUsers.map((person) => (
+                  <li key={person.id}>
+                    <strong>{person.name}</strong> — {person.pending} new place{person.pending === 1 ? "" : "s"} pending
+                  </li>
+                ))}
+              </ul>
+            </section>
+            <section className={styles.panel}>
+              <p className={styles.badge}>Rankings matrix</p>
+              <p className={styles.help}>All configured seats, side by side.</p>
+              <div className={styles.rankingGrid}>
+                {rankingColumns.length ? (
+                  rankingColumns.map((column) => (
+                    <article key={column.id} className={styles.rankingColumn}>
+                      <h2 className={styles.rankingColumnTitle}>
+                        {column.name}
+                      </h2>
+                      <p className={styles.rankingColumnMeta}>
+                        {column.ranked.length}/{column.total || column.ranked.length} ranked
+                      </p>
+                      <ol className={styles.rankingColumnList}>
+                        {column.ranked.length ? (
+                          column.ranked.map((place) => (
+                            <li key={place.id}>
+                              <span>{place.rank}.</span>{" "}
+                              <strong>{place.name}</strong>
+                              {place.date ? <span className={styles.rankingDate}> — {place.date}</span> : null}
+                            </li>
+                          ))
+                        ) : (
+                          <li className={styles.rankingEmpty}>No ranked places yet.</li>
+                        )}
+                      </ol>
+                    </article>
+                  ))
+                ) : (
+                  <p className={styles.help}>No ranking data available yet.</p>
+                )}
+              </div>
+            </section>
+          </>
+        )}
+
+        {activeTab === "seats" && (
+          <>
+            <section className={styles.panel}>
+              <p className={styles.badge}>Seat passwords</p>
+              <p className={styles.help}>Update seat passwords used on the Rankings page.</p>
+              {userPasswordMessage ? <p className={styles.message}>{userPasswordMessage}</p> : null}
+              <ul className={styles.passwordList}>
+                {configuredUsers.map((user) => (
+                  <li key={`password-${user.id}`}>
+                    <div className={styles.passwordHeader}>
+                      <strong>{user.name}</strong>
+                      {isSeedUser(user.id) ? (
+                        <span className={styles.userMeta}>fixed seat</span>
+                      ) : (
+                        <span className={styles.userMeta}>custom seat</span>
+                      )}
+                    </div>
+                    <div className={styles.passwordInputRow}>
+                      <label className={styles.passwordLabel} htmlFor={`admin-password-${user.id}`}>
+                        Password
+                      </label>
+                      <input
+                        id={`admin-password-${user.id}`}
+                        className={styles.passwordInput}
+                        value={userPasswordInputs[user.id] || ""}
+                        onChange={(event) => onPasswordInputChange(user.id, event.target.value)}
+                        autoComplete="off"
+                      />
                       <button
                         type="button"
                         className={styles.textButton}
-                        onClick={() => onDeleteGalleryItem(item)}
-                        disabled={isGalleryBusy || !isGalleryConfigured || !item.pathname}
+                        onClick={() => onPasswordSave(user.id)}
                       >
-                        Remove
+                        Save
                       </button>
                     </div>
                   </li>
                 ))}
               </ul>
-            ) : (
-              <p className={styles.help}>No uploaded photos yet.</p>
-            )}
-          </div>
-        </section>
-
-        <section className={styles.panel}>
-          <p className={styles.badge}>Pending insertions</p>
-          <ul className={styles.pendingList}>
-            {pendingUsers.map((person) => (
-              <li key={person.id}>
-                <strong>{person.name}</strong> — {person.pending} new place{person.pending === 1 ? "" : "s"} pending
-              </li>
-            ))}
-          </ul>
-        </section>
-
-        <section className={styles.panel}>
-          <p className={styles.badge}>Seat passwords</p>
-          <p className={styles.help}>Update seat passwords used on the Rankings page.</p>
-          {userPasswordMessage ? <p className={styles.message}>{userPasswordMessage}</p> : null}
-          <ul className={styles.passwordList}>
-            {configuredUsers.map((user) => (
-              <li key={`password-${user.id}`}>
-                <div className={styles.passwordHeader}>
-                  <strong>{user.name}</strong>
-                  {isSeedUser(user.id) ? (
-                    <span className={styles.userMeta}>fixed seat</span>
-                  ) : (
-                    <span className={styles.userMeta}>custom seat</span>
-                  )}
-                </div>
-                <div className={styles.passwordInputRow}>
-                  <label className={styles.passwordLabel} htmlFor={`admin-password-${user.id}`}>
-                    Password
-                  </label>
+            </section>
+            <section className={styles.panel}>
+              <p className={styles.badge}>Custom seats</p>
+              <p className={styles.help}>Add or remove optional seats for testing.</p>
+              {testUserMessage ? <p className={styles.message}>{testUserMessage}</p> : null}
+              <ul className={styles.pendingList}>
+                {configuredUsers.map((user) => (
+                  <li key={user.id}>
+                    <strong>{user.name}</strong>{" "}
+                    {isSeedUser(user.id) ? (
+                      <span className={styles.userMeta}>fixed seat</span>
+                    ) : (
+                      <button
+                        type="button"
+                        className={styles.textButton}
+                        onClick={() => onRemoveTestUser(user.id)}
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              <form className={styles.form} onSubmit={onAddTestUser}>
+                <label>
+                  Add custom seat
                   <input
-                    id={`admin-password-${user.id}`}
-                    className={styles.passwordInput}
-                    value={userPasswordInputs[user.id] || ""}
-                    onChange={(event) => onPasswordInputChange(user.id, event.target.value)}
+                    name="testSeatName"
+                    placeholder='e.g. Test 2'
+                    required
                     autoComplete="off"
                   />
-                  <button
-                    type="button"
-                    className={styles.textButton}
-                    onClick={() => onPasswordSave(user.id)}
-                  >
-                    Save
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </section>
-
-        <section className={styles.panel}>
-          <p className={styles.badge}>Custom seats</p>
-          <p className={styles.help}>Add or remove optional seats for testing.</p>
-          {testUserMessage ? <p className={styles.message}>{testUserMessage}</p> : null}
-          <ul className={styles.pendingList}>
-            {configuredUsers.map((user) => (
-              <li key={user.id}>
-                <strong>{user.name}</strong>{" "}
-                {isSeedUser(user.id) ? (
-                  <span className={styles.userMeta}>fixed seat</span>
-                ) : (
-                  <button
-                    type="button"
-                    className={styles.textButton}
-                    onClick={() => onRemoveTestUser(user.id)}
-                  >
-                    Remove
-                  </button>
-                )}
-              </li>
-            ))}
-          </ul>
-          <form className={styles.form} onSubmit={onAddTestUser}>
-            <label>
-              Add custom seat
-              <input
-                name="testSeatName"
-                placeholder='e.g. Test 2'
-                required
-                autoComplete="off"
-              />
-            </label>
-            <button type="submit">Add seat</button>
-          </form>
-        </section>
-
-        <section className={styles.panel}>
-          <p className={styles.badge}>Places</p>
-          {placeCalloutMessage ? <p className={styles.message}>{placeCalloutMessage}</p> : null}
-          {placeOrderMessage ? <p className={styles.message}>{placeOrderMessage}</p> : null}
-          <div className={styles.placeList}>
-            {places.map((place) => (
-              <article key={place.id} className={styles.placeRow}>
-                <strong>{place.name}</strong>
-                <span>{place.date}</span>
-                <small>{place.address}</small>
-                <div className={styles.placeRowActions}>
-                  {place.isClosed ? (
-                    <span className={styles.userMeta}>status: closed</span>
-                  ) : (
-                    <span className={styles.userMeta}>status: active</span>
-                  )}
-                  <label className={styles.placeHostRow}>
-                    Chosen by
-                    <select
-                      value={place.hostUserId || ""}
-                      onChange={(event) => onPlaceHostChange(place.id, event.target.value)}
-                      className={styles.placeHostSelect}
-                    >
-                      <option value="">— Unassigned —</option>
-                      <option value="all">All</option>
-                      {configuredUsers.map((user) => (
-                        <option key={`host-${place.id}-${user.id}`} value={user.id}>
-                          {user.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <button
-                    type="button"
-                    className={styles.textButton}
-                    onClick={() => onTogglePlaceClosed(place.id)}
-                  >
-                    {place.isClosed ? "Reopen this venue" : "Mark as closed"}
-                  </button>
-                </div>
-                <label className={styles.placeCalloutRowLabel}>
-                  Honor joke
-                  <textarea
-                    className={styles.placeCalloutTextArea}
-                    value={placeCalloutDrafts[place.id] || ""}
-                    onChange={(event) => onCalloutInputChange(place.id, event.target.value)}
-                    rows={2}
-                    placeholder="Add/edit joke for this place"
-                  />
                 </label>
-                <div className={styles.placeCalloutActions}>
-                  <button type="button" onClick={() => onSavePlaceCallout(place)}>
-                    Save
-                  </button>
-                  {Boolean(getCustomPlaceHint(place.name)) ? (
-                    <button
-                      type="button"
-                      className={styles.textButton}
-                      onClick={() => onDeletePlaceCallout(place)}
-                    >
-                      Remove
-                    </button>
-                  ) : null}
-                </div>
-                <label className={styles.placeOrderRowLabel}>
-                  What we ordered
-                  <textarea
-                    className={styles.placeOrderTextArea}
-                    value={placeOrderDrafts[place.id] || ""}
-                    onChange={(event) => onOrderInputChange(place.id, event.target.value)}
-                    rows={2}
-                    placeholder="Add/edit what we ordered"
-                  />
-                </label>
-                <div className={styles.placeCalloutActions}>
-                  <button type="button" onClick={() => onSavePlaceOrder(place)}>
-                    Save order
-                  </button>
-                </div>
-              </article>
-            ))}
-          </div>
-        </section>
+                <button type="submit">Add seat</button>
+              </form>
+            </section>
+          </>
+        )}
       </main>
     </>
   );

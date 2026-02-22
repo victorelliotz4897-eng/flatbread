@@ -166,17 +166,46 @@
   position: absolute;
   font-size: 2rem;
   left: 20%;
-  animation: highFiveEmoji 1.7s ease-in forwards;
+  animation: highFiveEmoji 2.6s ease-in forwards;
 }
 
-.highFiveEmoji:nth-child(2) {
+.highFiveEmoji_1,
+.highFiveEmoji_2,
+.highFiveEmoji_3,
+.highFiveEmoji_4,
+.highFiveEmoji_5,
+.highFiveEmoji_6 {
+  transition: transform 220ms ease;
+}
+
+.highFiveEmoji_1 {
   left: 50%;
   top: 15%;
 }
 
-.highFiveEmoji:nth-child(3) {
+.highFiveEmoji_2 {
+  left: 20%;
+  top: 18%;
+}
+
+.highFiveEmoji_3 {
   left: 75%;
   top: 18%;
+}
+
+.highFiveEmoji_4 {
+  left: 32%;
+  top: 12%;
+}
+
+.highFiveEmoji_5 {
+  left: 64%;
+  top: 11%;
+}
+
+.highFiveEmoji_6 {
+  left: 44%;
+  top: 4%;
 }
 
 @keyframes highFivePop {

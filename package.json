@@ -4,7 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "clean": "rm -rf .next",
     "build": "next build",
+    "deploy:local": "npm run clean && npm run build",
+    "deploy:vercel": "npm run clean && npx vercel --prod --yes",
     "start": "next start"
   },
   "dependencies": {
