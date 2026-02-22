@@ -33,7 +33,7 @@ export default function TombstonesPage() {
       <main className={styles.page}>
         <section className={styles.card}>
           <p className={styles.badge}>Graveyard</p>
-          <h1>🍽️ Tombstones</h1>
+          <h1 className={styles.title}>🍽️ Tombstones</h1>
           <p className={styles.lead}>
             Places that have made their final stop in the Flatbread Night tradition.
           </p>
@@ -68,7 +68,6 @@ export default function TombstonesPage() {
                   </article>
                 );
               })}
-              )}
             </div>
           )}
         </section>
