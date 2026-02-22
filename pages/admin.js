@@ -12,7 +12,8 @@ import {
   removeTestUser,
   setPlaceHost,
   resetAllRankings,
-  togglePlaceClosedState
+  togglePlaceClosedState,
+  setPlaceOrderedItems
 } from "../utils/rankingStore";
 import styles from "../styles/Admin.module.css";
 import { LANDING_GAME_KEY as ADMIN_LANDING_GAME_KEY } from "../data/config";
@@ -95,6 +96,8 @@ export default function AdminPage() {
   const [isGalleryBusy, setIsGalleryBusy] = useState(false);
   const [placeCalloutMessage, setPlaceCalloutMessage] = useState("");
   const [placeCalloutDrafts, setPlaceCalloutDrafts] = useState({});
+  const [placeOrderMessage, setPlaceOrderMessage] = useState("");
+  const [placeOrderDrafts, setPlaceOrderDrafts] = useState({});
   const addressTimerRef = useRef(null);
   const triggerLandingGame = () => {
     if (typeof window === "undefined") {
@@ -127,6 +130,11 @@ export default function AdminPage() {
         nextDrafts[place.id] = getPlaceHintText(place.name);
       });
       setPlaceCalloutDrafts(nextDrafts);
+      const nextOrderDrafts = {};
+      nextPlaces.forEach((place) => {
+        nextOrderDrafts[place.id] = place.orderedItems || "";
+      });
+      setPlaceOrderDrafts(nextOrderDrafts);
       setLoadError("");
     } catch (error) {
       setPlaces([]);
@@ -239,6 +247,10 @@ export default function AdminPage() {
     setPlaceCalloutDrafts((previous) => ({ ...previous, [placeId]: value }));
   };
 
+  const onOrderInputChange = (placeId, value) => {
+    setPlaceOrderDrafts((previous) => ({ ...previous, [placeId]: value }));
+  };
+
   const onSavePlaceCallout = (place) => {
     const hint = String(placeCalloutDrafts[place.id] || "").trim();
     if (!hint) {
@@ -269,6 +281,18 @@ export default function AdminPage() {
     }
     setPlaceCalloutMessage(result.message || `${placeLabel} joke removed.`);
     setPlaceCalloutDrafts((previous) => ({ ...previous, [place.id]: "" }));
+    refresh();
+  };
+
+  const onSavePlaceOrder = (place) => {
+    const value = String(placeOrderDrafts[place.id] || "").trim();
+    const result = setPlaceOrderedItems(place.id, value);
+    if (!result.updated) {
+      setPlaceOrderMessage(result.message || "Could not save order note.");
+      return;
+    }
+
+    setPlaceOrderMessage(result.message || "Order note saved.");
     refresh();
   };
 
@@ -861,6 +885,7 @@ export default function AdminPage() {
         <section className={styles.panel}>
           <p className={styles.badge}>Places</p>
           {placeCalloutMessage ? <p className={styles.message}>{placeCalloutMessage}</p> : null}
+          {placeOrderMessage ? <p className={styles.message}>{placeOrderMessage}</p> : null}
           <div className={styles.placeList}>
             {places.map((place) => (
               <article key={place.id} className={styles.placeRow}>
@@ -920,6 +945,21 @@ export default function AdminPage() {
                       Remove
                     </button>
                   ) : null}
+                </div>
+                <label className={styles.placeOrderRowLabel}>
+                  What we ordered
+                  <textarea
+                    className={styles.placeOrderTextArea}
+                    value={placeOrderDrafts[place.id] || ""}
+                    onChange={(event) => onOrderInputChange(place.id, event.target.value)}
+                    rows={2}
+                    placeholder="Add/edit what we ordered"
+                  />
+                </label>
+                <div className={styles.placeCalloutActions}>
+                  <button type="button" onClick={() => onSavePlaceOrder(place)}>
+                    Save order
+                  </button>
                 </div>
               </article>
             ))}

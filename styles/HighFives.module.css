@@ -50,13 +50,7 @@
   background: #fffdf6;
   border: 2px solid #2f261f;
   border-left: 4px solid #8a2b1a;
-  cursor: pointer;
   text-align: left;
-}
-
-.matchCard:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(48, 31, 18, 0.14);
 }
 
 .rankBadge {
@@ -101,7 +95,23 @@
 }
 
 .cheer {
+  border: none;
+  background: none;
+  padding: 0;
+  line-height: 1;
+  width: 1.8rem;
+  height: 1.8rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-size: 1.22rem;
+  cursor: pointer;
+}
+
+.cheer:focus-visible {
+  outline: 2px solid #3f2a1d;
+  outline-offset: 2px;
+  border-radius: 999px;
 }
 
 .highFiveOverlay {

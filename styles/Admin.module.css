@@ -234,6 +234,25 @@
   flex-wrap: wrap;
 }
 
+.placeOrderRowLabel {
+  display: grid;
+  gap: 0.28rem;
+  color: #6f5c4d;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-top: 0.5rem;
+}
+
+.placeOrderTextArea {
+  border: 1px solid #b09a86;
+  background: #fff;
+  padding: 0.5rem 0.55rem;
+  font-size: 0.86rem;
+  min-height: 4.7rem;
+  resize: vertical;
+}
+
 .calloutList {
   margin: 0.75rem 0 0;
   padding: 0;

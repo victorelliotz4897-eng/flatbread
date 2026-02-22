@@ -29,12 +29,12 @@ export default function HonorPage() {
               return (
                 <details key={entry.normalized} className={styles.panelItem}>
                   <summary className={styles.summary}>
-                    <span>
+                    <span className={styles.sliceTrigger}>
                       <span className={styles.sliceEmoji} aria-hidden>
                         🍕
                       </span>
-                      {entry.display}
                     </span>
+                    <span className={styles.summaryText}>{entry.display}</span>
                     <span className={styles.chevron} aria-hidden>
                       ▼
                     </span>

@@ -2,7 +2,7 @@
   width: min(980px, 92vw);
   margin: 1.4rem auto 2.2rem;
   padding: 0 0 1rem;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .card {
@@ -14,6 +14,7 @@
   border-bottom: 2px solid #dbbd9f;
   padding: 1.2rem;
   box-shadow: 0 10px 24px rgba(38, 22, 14, 0.16);
+  overflow: visible;
 }
 
 .badge {
@@ -42,28 +43,40 @@
   inset: 0;
   pointer-events: none;
   overflow: hidden;
-  z-index: 0;
+  z-index: 15;
+  min-height: 45vh;
 }
 
 .runner {
   position: absolute;
-  top: -0.6rem;
-  left: -8vw;
-  font-size: 1.9rem;
+  top: 0;
+  left: 0;
+  font-size: 4.5rem;
   display: inline-flex;
   align-items: center;
-  gap: 0.15rem;
-  animation: pizza-runner 24s linear infinite;
+  justify-content: center;
+  line-height: 1;
+  will-change: transform;
+  z-index: 20;
+  transform-origin: center;
 }
 
 .runnerBody {
+  transform: scaleX(var(--runner-dir, 1));
   display: inline-block;
+  position: relative;
+  z-index: 1;
 }
 
 .runnerPizza {
-  position: relative;
-  top: -0.35rem;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  font-size: 1.24rem;
+  z-index: 3;
+  transform: translate(-50%, -50%) rotate(-5deg) scale(1.08);
   animation: pizza-wobble 0.8s ease-in-out infinite alternate;
+  pointer-events: none;
 }
 
 .runner::after {
@@ -85,10 +98,12 @@
 
 .listWrap {
   position: relative;
-  z-index: 1;
+  z-index: 2;
   display: grid;
   gap: 0.7rem;
-  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-rows: minmax(245px, 1fr);
+  align-items: stretch;
 }
 
 .tombstone {
@@ -97,67 +112,93 @@
   --tomb-outline: #4f180f;
   --tomb-cap: #f7d7b3;
   position: relative;
-  min-height: 190px;
-  border: 2px solid var(--tomb-outline);
-  background: linear-gradient(180deg, #fff 0, var(--tomb-ground) 40%, #f0e2c6 100%);
-  border-radius: 0.8rem 0.8rem 1.1rem 1.1rem;
-  padding: 1rem 0.7rem 0.85rem;
-  overflow: hidden;
-  box-shadow: 0 10px 20px rgba(37, 24, 17, 0.18);
+  min-height: 0;
+  height: 100%;
+  min-width: 0;
+  border: none;
+  background: none;
+  border-radius: 0;
+  padding: 0;
+  overflow: visible;
+  display: block;
+  text-align: center;
+  min-height: 15rem;
 }
 
-.tombstone::before,
-.tombstone::after {
+.tombstonePlate {
   position: absolute;
-  content: "";
-  inset-inline: 0.45rem;
-}
-
-.tombstone::before {
-  top: 0.8rem;
-  height: 0.5rem;
-  border-radius: 0.4rem;
-  background: var(--tomb-rim);
-}
-
-.tombstone::after {
-  top: 1.35rem;
-  height: 0.65rem;
-  border-radius: 0.7rem 0.7rem 0.4rem 0.4rem;
-  background: linear-gradient(90deg, var(--tomb-cap), color-mix(in srgb, var(--tomb-cap) 60%, #fff 40%), var(--tomb-cap));
-  border: 1px solid var(--tomb-outline);
-  opacity: 0.8;
-}
-
-.tombHead {
-  position: absolute;
-  top: 0.55rem;
-  right: 0.56rem;
-  font-size: 0.96rem;
-  opacity: 0.9;
+  inset: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: #0b0705;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  line-height: 1;
+  font-size: clamp(5rem, 38cqi, 11rem);
+  margin: 0;
+  z-index: 1;
+  pointer-events: none;
+  text-align: center;
+  text-shadow: 0 2px 2px rgba(255, 255, 255, 0.4);
+  transform: translateZ(0) scale(1);
+  transform-origin: center;
 }
 
 .tombDate {
-  margin: 0.2rem 0 0.52rem;
-  font-size: 0.79rem;
+  margin: 0;
+  font-size: 0.72rem;
   letter-spacing: 0.03em;
   text-transform: uppercase;
-  color: #5d4938;
+  color: #fff;
+  text-align: center;
+  font-weight: 700;
+  line-height: 1.05;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  position: relative;
+  z-index: 3;
 }
 
 .tombstone h2 {
   margin: 0;
-  font-size: 1.02rem;
-  line-height: 1.1;
-  color: #321f10;
+  font-size: clamp(0.72rem, 1.4vw, 1.05rem);
+  line-height: 1.02;
+  color: #fff;
+  max-width: 95%;
+  text-align: center;
+  position: relative;
+  z-index: 3;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
 }
 
-.tombAddress {
-  margin: 0.42rem 0 0;
-  line-height: 1.22;
-  font-size: 0.9rem;
-  color: #574235;
-  min-height: 2.4rem;
+.tombHost {
+  margin: 0;
+  line-height: 1.05;
+  font-size: 0.64rem;
+  color: #fff;
+  text-align: center;
+  letter-spacing: 0.02em;
+  position: relative;
+  z-index: 3;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.tombContent {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  z-index: 2;
+  border-radius: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.42rem;
+  padding: 2.45rem 0.7rem 0.9rem;
+  background: none;
+  transform: rotate(0deg);
 }
 
 .empty + .listWrap {
@@ -174,41 +215,65 @@
 
 @media (max-width: 660px) {
   .listWrap {
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-rows: minmax(0, 30vh);
   }
 
   .tombstone {
-    min-height: 170px;
+    min-height: 210px;
+    border-radius: 2rem 2rem 0.85rem 0.85rem;
   }
 
   .runner {
-    font-size: 1.5rem;
+    font-size: 3.15rem;
+  }
+}
+
+@media (max-width: 460px) {
+  .listWrap {
+    grid-template-columns: 1fr;
+    grid-auto-rows: auto;
+    gap: 0.55rem;
+  }
+
+  .tombstone {
+    min-height: 240px;
+  }
+
+  .tombstonePlate {
+    font-size: clamp(4.4rem, 42vw, 7.2rem);
+  }
+
+  .tombstone h2 {
+    font-size: 0.62rem;
+    line-height: 1.06;
+  }
+
+  .tombDate {
+    font-size: 0.6rem;
+    line-height: 1;
+  }
+
+  .tombHost {
+    font-size: 0.55rem;
+    line-height: 1;
+    letter-spacing: 0.01em;
+  }
+
+  .tombContent {
+    padding: 2.65rem 0.6rem 0.72rem;
+    gap: 0.32rem;
   }
 }
 
 @keyframes pizza-runner {
   0% {
-    transform: translate(-12vw, 0) rotate(0deg);
-    opacity: 0;
-  }
-  7% {
-    opacity: 0.95;
-  }
-  45% {
-    transform: translate(36vw, 26vh) rotate(4deg);
-    opacity: 0.95;
-  }
-  62% {
-    transform: translate(58vw, 12vh) rotate(-2deg);
-    opacity: 0.9;
-  }
-  78% {
-    transform: translate(86vw, 48vh) rotate(5deg);
-    opacity: 0.85;
+    transform: translate(-8vw, 0) rotate(-2deg);
+    opacity: 0.98;
   }
   100% {
-    transform: translate(118vw, 0) rotate(0deg);
-    opacity: 0;
+    transform: translate(108vw, 0) rotate(2deg);
+    opacity: 0.98;
   }
 }
 

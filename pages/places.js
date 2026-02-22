@@ -1,10 +1,34 @@
 import Head from "next/head";
 import { useEffect, useState } from "react";
 import SiteNav from "../components/SiteNav";
-import { getAllPlaces } from "../utils/rankingStore";
+import { getAllPlaces, getConfiguredUsers } from "../utils/rankingStore";
 import styles from "../styles/Places.module.css";
 
+const PLACE_HOST_ALL_LABEL = "All";
+
+function buildHostNameById() {
+  const users = getConfiguredUsers();
+  const map = {};
+  users.forEach((user) => {
+    if (user?.id) {
+      map[user.id] = user.name || user.id;
+    }
+  });
+  return map;
+}
+
+function formatHost(place, hostNameById) {
+  if (!place.hostUserId) {
+    return "Host TBD";
+  }
+  if (place.hostUserId === "all") {
+    return PLACE_HOST_ALL_LABEL;
+  }
+  return hostNameById[place.hostUserId] || place.hostUserId;
+}
+
 function normalizePlaces() {
+  const hostNameById = buildHostNameById();
   return getAllPlaces()
     .slice()
     .sort((a, b) => b.visitDate - a.visitDate)
@@ -12,7 +36,9 @@ function normalizePlaces() {
       id: place.id,
       name: place.name,
       date: place.date,
-      address: place.address
+      address: place.address,
+      hostName: formatHost(place, hostNameById),
+      orderedItems: place.orderedItems || "—"
     }));
 }
 
@@ -47,6 +73,8 @@ export default function PlacesPage() {
                 <h2>{place.name}</h2>
                 <p className={styles.date}>{place.date}</p>
                 <p>{place.address}</p>
+                <p className={styles.host}>by {place.hostName}</p>
+                <p className={styles.order}>Ordered: {place.orderedItems}</p>
               </article>
             ))}
           </div>

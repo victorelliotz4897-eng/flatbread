@@ -6,6 +6,9 @@ const RANKING_SYNC_ENDPOINT = "/api/rankings";
 const TEST_USER_LIST_KEY = "flatbread-test-user-accounts-v1";
 const USER_PASSWORDS_KEY = "flatbread-user-passwords-v1";
 const PLACE_STATE_CLOSED_KEY = "closedPlaceIds";
+const PLACE_HOST_MAP_KEY = "hostByPlaceId";
+const PLACE_ORDER_NOTES_KEY = "orderedItemsByPlaceId";
+const PLACE_HOST_ALL = "all";
 
 const DEFAULT_USER_PASSWORDS = {
   victor: "robertas",
@@ -201,6 +204,21 @@ function safeString(value) {
     return "";
   }
   return value.trim();
+}
+
+function normalizePlaceOrderNotes(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+  const map = {};
+  Object.keys(value).forEach((rawPlaceId) => {
+    const placeId = safeString(rawPlaceId);
+    const note = safeString(value[rawPlaceId]);
+    if (placeId && note) {
+      map[placeId] = note;
+    }
+  });
+  return map;
 }
 
 function normalizePassword(value) {
@@ -541,7 +559,9 @@ function baseState() {
     users,
     places: {
       custom: [],
-      [PLACE_STATE_CLOSED_KEY]: []
+      [PLACE_STATE_CLOSED_KEY]: [],
+      [PLACE_HOST_MAP_KEY]: {},
+      [PLACE_ORDER_NOTES_KEY]: {}
     }
   };
 }
@@ -580,7 +600,12 @@ function getStorageState() {
       custom: Array.isArray(parsed.places?.custom) ? parsed.places.custom : [],
       [PLACE_STATE_CLOSED_KEY]: Array.isArray(parsed.places?.[PLACE_STATE_CLOSED_KEY])
         ? normalizePlaceIdList(parsed.places[PLACE_STATE_CLOSED_KEY])
-        : []
+        : [],
+      [PLACE_ORDER_NOTES_KEY]: normalizePlaceOrderNotes(parsed.places?.[PLACE_ORDER_NOTES_KEY]),
+      [PLACE_HOST_MAP_KEY]: (() => {
+        const map = parsed.places?.[PLACE_HOST_MAP_KEY];
+        return map && typeof map === "object" && !Array.isArray(map) ? map : {};
+      })()
     };
     merged.version = parsed.version || SCHEMA_VERSION;
 
@@ -589,6 +614,20 @@ function getStorageState() {
     merged.places[PLACE_STATE_CLOSED_KEY] = merged.places[PLACE_STATE_CLOSED_KEY].filter((id) =>
       validPlaceIds.has(id)
     );
+    const hostMap = merged.places[PLACE_HOST_MAP_KEY] || {};
+    const validHostMap = {};
+    Object.keys(hostMap).forEach((placeId) => {
+      const normalizedPlaceId = safeString(placeId);
+      const hostUserId = safeString(hostMap[placeId]);
+      if (!normalizedPlaceId || !validPlaceIds.has(normalizedPlaceId)) {
+        return;
+      }
+      if (hostUserId && hostUserId !== PLACE_HOST_ALL && !isKnownUserId(hostUserId)) {
+        return;
+      }
+      validHostMap[normalizedPlaceId] = hostUserId;
+    });
+    merged.places[PLACE_HOST_MAP_KEY] = validHostMap;
     return merged;
   } catch (error) {
     return baseState();
@@ -626,7 +665,9 @@ function sanitizePlace(raw) {
     lng: Number(raw.lng),
     visitDate: parsed.visitDate.toISOString(),
     source: "custom",
-    targetUsers: normalizeStringList(raw.targetUsers)
+    targetUsers: normalizeStringList(raw.targetUsers),
+    hostUserId: safeString(raw.hostUserId),
+    orderedItems: safeString(raw.orderedItems)
   };
 }
 
@@ -638,7 +679,8 @@ function hydrateBasePlace(place) {
     targetUsers: normalizeStringList(place.targetUsers),
     visitDate: nowAsDate(place.visitDate),
     date: place.date,
-    dateRaw: normalized || place.date
+    dateRaw: normalized || place.date,
+    hostUserId: safeString(place.hostUserId)
   };
 }
 
@@ -647,7 +689,9 @@ function hydrateCustomPlace(place) {
     ...place,
     targetUsers: normalizeStringList(place.targetUsers),
     source: "custom",
-    visitDate: nowAsDate(place.visitDate)
+    visitDate: nowAsDate(place.visitDate),
+    hostUserId: safeString(place.hostUserId),
+    orderedItems: safeString(place.orderedItems)
   };
 }
 
@@ -701,6 +745,8 @@ function nextUnrankedPlace(allPlaces, user) {
 function allChronologicalPlaces(state) {
   const custom = Array.isArray(state.places?.custom) ? state.places.custom : [];
   const closedSet = new Set(normalizePlaceIdList(state.places?.[PLACE_STATE_CLOSED_KEY]));
+  const hostMap = state.places?.[PLACE_HOST_MAP_KEY] || {};
+  const orderNotes = normalizePlaceOrderNotes(state.places?.[PLACE_ORDER_NOTES_KEY]);
   const staticPlaces = flatbreadLocations.map(hydrateBasePlace);
   const customPlaces = custom.map(sanitizePlace).map(hydrateCustomPlace);
 
@@ -711,8 +757,15 @@ function allChronologicalPlaces(state) {
       continue;
     }
     seen.add(place.id);
+    const hostUserId = safeString(hostMap[place.id]);
     places.push({
       ...place,
+      hostUserId: hostUserId === PLACE_HOST_ALL
+        ? PLACE_HOST_ALL
+        : isKnownUserId(hostUserId)
+          ? hostUserId
+          : safeString(place.hostUserId),
+      orderedItems: safeString(orderNotes[place.id] || place.orderedItems),
       isClosed: closedSet.has(place.id)
     });
   }
@@ -1339,6 +1392,100 @@ export function resetAllRankings() {
     syncRankingStateToServer(user.id, state);
   });
   saveState(state);
+}
+
+export function setPlaceHost(placeId, hostUserId) {
+  const state = getStorageState();
+  const resolvedPlaceId = safeString(placeId);
+  const resolvedHostId = safeString(hostUserId);
+  const normalizedHostId = resolvedHostId === PLACE_HOST_ALL ? PLACE_HOST_ALL : resolvedHostId;
+
+  if (!resolvedPlaceId) {
+    return {
+      updated: false,
+      message: "Missing place."
+    };
+  }
+
+  const allPlaces = allChronologicalPlaces(state);
+  if (!allPlaces.some((place) => place.id === resolvedPlaceId)) {
+    return {
+      updated: false,
+      message: "Place not found."
+    };
+  }
+
+  if (normalizedHostId && normalizedHostId !== PLACE_HOST_ALL && !isKnownUserId(normalizedHostId)) {
+    return {
+      updated: false,
+      message: "Invalid host selection."
+    };
+  }
+
+  const hostMap = {
+    ...(state.places?.[PLACE_HOST_MAP_KEY] || {})
+  };
+
+  if (!resolvedHostId) {
+    delete hostMap[resolvedPlaceId];
+  } else {
+    hostMap[resolvedPlaceId] = normalizedHostId;
+  }
+
+  state.places = {
+    ...(state.places || {}),
+    [PLACE_HOST_MAP_KEY]: hostMap
+  };
+  saveState(state);
+  return {
+    updated: true,
+    placeId: resolvedPlaceId,
+    hostUserId: normalizedHostId
+  };
+}
+
+export function setPlaceOrderedItems(placeId, orderedItems) {
+  const state = getStorageState();
+  const resolvedPlaceId = safeString(placeId);
+  const resolvedItems = safeString(orderedItems);
+  if (!resolvedPlaceId) {
+    return {
+      updated: false,
+      message: "Missing place."
+    };
+  }
+
+  const allPlaces = allChronologicalPlaces(state);
+  if (!allPlaces.some((place) => place.id === resolvedPlaceId)) {
+    return {
+      updated: false,
+      message: "Place not found."
+    };
+  }
+
+  const customPlaces = Array.isArray(state.places?.custom) ? state.places.custom : [];
+  const isCustomPlace = customPlaces.some((place) => place.id === resolvedPlaceId);
+  if (isCustomPlace) {
+    state.places.custom = customPlaces.map((place) =>
+      place.id === resolvedPlaceId ? { ...place, orderedItems: resolvedItems } : place
+    );
+  } else {
+    const orderNotes = normalizePlaceOrderNotes(state.places?.[PLACE_ORDER_NOTES_KEY]);
+    if (resolvedItems) {
+      orderNotes[resolvedPlaceId] = resolvedItems;
+    } else {
+      delete orderNotes[resolvedPlaceId];
+    }
+    state.places[PLACE_ORDER_NOTES_KEY] = orderNotes;
+  }
+
+  saveState(state);
+  return {
+    updated: true,
+    placeId: resolvedPlaceId,
+    orderedItems: resolvedItems,
+    message: "Order note updated."
+  };
 }
 
 export function getUsersPendingCounts() {

@@ -42,24 +42,17 @@ export default function HighFivesPage() {
       if (!entry.id || seenUserIds.has(entry.id)) {
         return false;
       }
-      if (!Number.isInteger(entry.totalPlaces) || entry.totalPlaces <= 0) {
+      if (!entry.ranked || entry.ranked.length === 0) {
+        return false;
+      }
+      if (entry.phase === "empty" || entry.phase === "landing") {
         return false;
       }
       seenUserIds.add(entry.id);
       return true;
     });
 
-    const totalPlaceCounts = new Map();
-    for (const entry of cleanRankings) {
-      const count = totalPlaceCounts.get(entry.totalPlaces) || [];
-      count.push(entry);
-      totalPlaceCounts.set(entry.totalPlaces, count);
-    }
-
-    const canonicalCount = [...totalPlaceCounts.keys()].sort((left, right) => right - left)[0] || 0;
-    const eligibleUsers = canonicalCount > 0
-      ? totalPlaceCounts.get(canonicalCount) || []
-      : [];
+    const eligibleUsers = cleanRankings;
 
     const matchMap = new Map();
 
@@ -135,7 +128,7 @@ export default function HighFivesPage() {
           <p className={styles.badge}>Rankings</p>
           <h1>High Fives</h1>
           <p className={styles.lead}>
-            Tap a matching spot to celebrate when two or more seats agreed at the same rank.
+            Hit the hand for each match to celebrate when two or more seats agreed at the same rank and place.
           </p>
 
           {totalUsers === 0 ? (
@@ -143,23 +136,25 @@ export default function HighFivesPage() {
           ) : hasMatches ? (
             <div className={styles.matchList}>
               {matches.map((match) => (
-                <button
-                  type="button"
+                <div
                   key={match.key}
                   className={styles.matchCard}
-                  onClick={() => triggerHighFive(match)}
-                  aria-label={`High five for ${match.placeName} at ${normalizeRankLabel(match.rankIndex)}`}
                 >
                   <p className={styles.rankBadge}>{normalizeRankLabel(match.rankIndex)}</p>
                   <div className={styles.matchCopy}>
                     <p className={styles.matchName}>{match.placeName}</p>
                     {match.placeDate ? <p className={styles.matchDate}>{match.placeDate}</p> : null}
-                    <p className={styles.matchUsers}>🤝 {match.userLabel}</p>
+                    <p className={styles.matchUsers}>👥 {match.userLabel}</p>
                   </div>
-                  <span className={styles.cheer} aria-hidden="true">
-                    👉
-                  </span>
-                </button>
+                  <button
+                    type="button"
+                    className={styles.cheer}
+                    onClick={() => triggerHighFive(match)}
+                    aria-label={`High five for ${match.placeName} at ${normalizeRankLabel(match.rankIndex)}`}
+                  >
+                    ✋
+                  </button>
+                </div>
               ))}
             </div>
           ) : (

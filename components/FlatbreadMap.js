@@ -15,6 +15,49 @@ const secretSpots = [
   }
 ];
 
+const HOST_ALL_LABEL = "All";
+const HOST_FALLBACK_LABEL = "Host TBD";
+
+function escapeHtml(value) {
+  const text = String(value || "");
+  return text
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function formatHostLine(hostUserId, hostNameById) {
+  const hostId = String(hostUserId || "").trim();
+  if (!hostId) {
+    return "";
+  }
+  if (hostId === "all") {
+    return HOST_ALL_LABEL;
+  }
+  const hostName = hostNameById?.[hostId];
+  return hostName ? String(hostName).trim() : "";
+}
+
+function formatHostHtml(hostUserId, hostNameById) {
+  const label = formatHostLine(hostUserId, hostNameById);
+  if (!label) {
+    return "";
+  }
+  return `<p class="map-popup-host"><em>by ${escapeHtml(label)}</em></p>`;
+}
+
+function buildHostHtml(hostUserId, hostNameById, fallback = true) {
+  const label = formatHostLine(hostUserId, hostNameById);
+  if (!label) {
+    return fallback
+      ? `<p class="map-popup-host"><em>by ${escapeHtml(HOST_FALLBACK_LABEL)}</em></p>`
+      : "";
+  }
+  return `<p class="map-popup-host"><em>by ${escapeHtml(label)}</em></p>`;
+}
+
 function clusterPin(size, isCluster, isClosed) {
   const iconText = isClosed ? "🪦" : "🍕";
   return new L.DivIcon({
@@ -70,7 +113,7 @@ function clusterLocations(locations) {
   return grouped;
 }
 
-export default function FlatbreadMap({ locations }) {
+export default function FlatbreadMap({ locations, hostNameById = {} }) {
   const clusters = useMemo(
     () => clusterLocations([...locations, ...secretSpots]),
     [locations]
@@ -93,40 +136,43 @@ export default function FlatbreadMap({ locations }) {
         const popupItem = !hasMultiple ? cluster.items[0] : null;
         const isSecretGallerySpot = popupItem?.isSecretGallery && popupItem?.galleryUrl;
         const isClosedSpot = popupItem?.isClosed;
-        const popupTitle = hasMultiple
-          ? `<strong>${cluster.items.length} places</strong>`
-          : (isSecretGallerySpot
-            ? ""
-            : (isClosedSpot ? "<strong>Graveyard</strong>" : `<strong>${popupItem?.name || ""}</strong>`));
+        const allClosed = cluster.items.length > 1 && cluster.items.every((item) => item?.isClosed);
+        const graveyardLink = `<p class="map-gallery-link-wrap"><a class="graveyard-link" href="/tombstones">Graveyard</a></p>`;
         const galleryLink = popupItem?.galleryUrl
           ? `<p class="map-gallery-link-wrap"><a href="${popupItem.galleryUrl}" target="_blank" rel="noopener noreferrer">Make the Pizza</a></p>`
           : "";
-        const tombstoneLink = isClosedSpot
-          ? `<p class="map-gallery-link-wrap"><a href="/tombstones">Graveyard</a></p>`
-          : "";
+        const popupTitle = !hasMultiple && isSecretGallerySpot
+          ? ""
+          : hasMultiple
+            ? `<strong>${cluster.items.length} places</strong>`
+            : (isClosedSpot ? "" : `<strong>${popupItem?.name || ""}</strong>`);
         const popupList = hasMultiple
-          ? `<ul>${cluster.items
-              .map((item) => `<li>${item.name}<br/><small>${item.date}</small></li>`)
-              .join("")}</ul>`
-          : (isSecretGallerySpot || isClosedSpot
-            ? `${galleryLink}${tombstoneLink}`
-            : `<p>${popupItem?.date ? `${popupItem.date}<br/>` : ""}<small class="map-location">${popupItem?.address || ""}</small></p>`);
-        const addressList = hasMultiple
           ? `<div class=\"map-cluster-address\">${cluster.items
-              .map((item) => `<div><strong>${item.name}</strong><br/><small>${item.date}</small><small class=\"map-location\">${item.address}</small></div>`)
+              .map((item) => `<div><strong>${escapeHtml(item?.name || "")}</strong><br/><small>${escapeHtml(item?.date || "")}</small><small class=\"map-location\">${escapeHtml(item?.address || "")}</small>${buildHostHtml(item?.hostUserId, hostNameById)}</div>`)
               .join("<hr/>")}</div>`
-          : "";
+          : (isSecretGallerySpot
+            ? `${galleryLink}`
+            : (isClosedSpot
+              ? `${graveyardLink}`
+              : `${popupTitle}<p>${popupItem?.date ? `${escapeHtml(popupItem.date)}<br/>` : ""}<small class=\"map-location\">${escapeHtml(popupItem?.address || "")}</small></p>${buildHostHtml(popupItem?.hostUserId, hostNameById, true)}`));
+        const popupContent = allClosed
+          ? graveyardLink
+          : isSecretGallerySpot
+            ? `${galleryLink}`
+            : hasMultiple
+              ? `${popupTitle}${popupList}`
+              : popupList;
 
         return (
           <Marker
             key={`${cluster.lat}-${cluster.lng}-${index}`}
             position={[cluster.anchor.lat, cluster.anchor.lng]}
-            icon={clusterPin(cluster.items.length, hasMultiple, isClosedSpot)}
+            icon={clusterPin(cluster.items.length, hasMultiple, allClosed || isClosedSpot)}
           >
             <Popup>
               <div
                 className="map-popup"
-                dangerouslySetInnerHTML={{ __html: `${popupTitle}${hasMultiple ? `${addressList}` : popupList}` }}
+                dangerouslySetInnerHTML={{ __html: popupContent }}
               />
             </Popup>
           </Marker>

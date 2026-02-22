@@ -317,12 +317,36 @@ a {
   text-decoration: underline;
 }
 
+.graveyard-link {
+  color: #121212 !important;
+  font-weight: 700;
+  text-decoration: none;
+  text-transform: none;
+  letter-spacing: 0.02em;
+}
+
+.graveyard-link:hover,
+.graveyard-link:focus-visible {
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+}
+
 .map-location {
   display: block;
   color: #5d4b3b;
   margin-top: 0.26rem;
   white-space: nowrap;
   font-size: 0.82rem;
+}
+
+.map-popup-host {
+  margin: 0.28rem 0 0;
+  color: #4b3425;
+  font-size: 0.85rem;
+}
+
+.map-popup-host em {
+  font-style: italic;
 }
 
 .map-cluster-address {

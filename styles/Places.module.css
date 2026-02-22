@@ -75,6 +75,19 @@
   color: var(--muted);
 }
 
+.host {
+  margin-top: 0.28rem !important;
+  color: #6f4b2d;
+  font-size: 0.92rem;
+  font-style: italic;
+}
+
+.order {
+  margin-top: 0.18rem !important;
+  color: #57422e;
+  font-size: 0.86rem;
+}
+
 @media (max-width: 760px) {
   .page {
     width: min(1040px, 94vw);

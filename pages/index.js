@@ -10,7 +10,7 @@ import {
   getFlatbreadMonthCount
 } from "../data/config";
 import { flatbreadLocations } from "../data/locations";
-import { getAllPlaces } from "../utils/rankingStore";
+import { getAllPlaces, getConfiguredUsers } from "../utils/rankingStore";
 import styles from "../styles/Home.module.css";
 
 const FlatbreadMap = dynamic(() => import("../components/FlatbreadMap"), {
@@ -86,6 +86,7 @@ function makeSliceDeck(seedBase) {
 export default function HomePage() {
   const isLandingReplay = false;
   const [locations, setLocations] = useState(flatbreadLocations);
+  const [configuredUsers, setConfiguredUsers] = useState(() => getConfiguredUsers());
   const [gameUnlocked, setGameUnlocked] = useState(false);
   const [gameLoaded, setGameLoaded] = useState(false);
   const [gameMessage, setGameMessage] = useState("Feed me.");
@@ -110,6 +111,15 @@ export default function HomePage() {
     .sort((a, b) => b.visitDate - a.visitDate)
     .map((location) => `${location.name} (${location.date})`);
 
+  const hostNameById = {
+    ...configuredUsers.reduce((accumulator, user) => {
+      if (user?.id) {
+        accumulator[user.id] = user.name || user.id;
+      }
+      return accumulator;
+    }, {})
+  };
+
   useEffect(() => {
     const readUnlockState = () => {
       if (isLandingReplayRequested()) {
@@ -124,6 +134,7 @@ export default function HomePage() {
     readUnlockState();
     setGameLoaded(true);
     setLocations(getAllPlaces());
+    setConfiguredUsers(getConfiguredUsers());
     window.addEventListener("storage", readUnlockState);
     return () => window.removeEventListener("storage", readUnlockState);
   }, []);
@@ -522,10 +533,10 @@ export default function HomePage() {
           </section>
 
           <section className={styles.mapPanel} aria-label="Restaurant map">
-            <Link href="/places" className={styles.mapPanelTitle}>
-              THE WALL OF RECORD
-            </Link>
-            <FlatbreadMap locations={locations} />
+              <Link href="/places" className={styles.mapPanelTitle}>
+                THE WALL OF RECORD
+              </Link>
+            <FlatbreadMap locations={locations} hostNameById={hostNameById} />
             <div className={styles.footerTabs} aria-label="Explore sections">
               <Link href="/rules" className={styles.tabButton} aria-label="Rules">
                 <span aria-hidden>🍕</span>
