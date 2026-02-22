@@ -10,11 +10,18 @@ import {
   setPasswordForUser,
   getUsersPendingCounts,
   removeTestUser,
+  setPlaceHost,
   resetAllRankings,
   togglePlaceClosedState
 } from "../utils/rankingStore";
 import styles from "../styles/Admin.module.css";
 import { LANDING_GAME_KEY as ADMIN_LANDING_GAME_KEY } from "../data/config";
+import {
+  removeCustomPlaceHint,
+  saveCustomPlaceHint,
+  getCustomPlaceHint,
+  getPlaceHintText
+} from "../utils/placeCallouts";
 
 const ADMIN_PASSWORD = "lakeplacid2020";
 const ADMIN_RANKING_RESET_KEY = "lakeplacid2020";
@@ -86,6 +93,8 @@ export default function AdminPage() {
   const [galleryConfigMessage, setGalleryConfigMessage] = useState("");
   const [galleryItems, setGalleryItems] = useState([]);
   const [isGalleryBusy, setIsGalleryBusy] = useState(false);
+  const [placeCalloutMessage, setPlaceCalloutMessage] = useState("");
+  const [placeCalloutDrafts, setPlaceCalloutDrafts] = useState({});
   const addressTimerRef = useRef(null);
   const triggerLandingGame = () => {
     if (typeof window === "undefined") {
@@ -99,7 +108,8 @@ export default function AdminPage() {
 
   const refresh = () => {
     try {
-      setPlaces(getAllPlaces());
+      const nextPlaces = getAllPlaces();
+      setPlaces(nextPlaces);
       setPendingUsers(getUsersPendingCounts());
       const usersWithPasswords = getConfiguredUsersWithPasswords();
       setConfiguredUsers(usersWithPasswords);
@@ -112,6 +122,11 @@ export default function AdminPage() {
         });
         return next;
       });
+      const nextDrafts = {};
+      nextPlaces.forEach((place) => {
+        nextDrafts[place.id] = getPlaceHintText(place.name);
+      });
+      setPlaceCalloutDrafts(nextDrafts);
       setLoadError("");
     } catch (error) {
       setPlaces([]);
@@ -218,6 +233,43 @@ export default function AdminPage() {
     });
     setAddressResults([]);
     setAddressLookupStatus("");
+  };
+
+  const onCalloutInputChange = (placeId, value) => {
+    setPlaceCalloutDrafts((previous) => ({ ...previous, [placeId]: value }));
+  };
+
+  const onSavePlaceCallout = (place) => {
+    const hint = String(placeCalloutDrafts[place.id] || "").trim();
+    if (!hint) {
+      setPlaceCalloutMessage("Please enter a joke before saving.");
+      return;
+    }
+
+    const result = saveCustomPlaceHint(place.name, hint);
+    if (!result.updated) {
+      setPlaceCalloutMessage(result.message || "Could not save honor joke.");
+      return;
+    }
+
+    setPlaceCalloutMessage(result.message || "Honor joke saved.");
+    refresh();
+  };
+
+  const onDeletePlaceCallout = (place) => {
+    const placeLabel = place.name || place.normalized || place.id;
+    const confirmed = window.confirm(`Delete joke for ${placeLabel}?`);
+    if (!confirmed) {
+      return;
+    }
+    const result = removeCustomPlaceHint(place.name);
+    if (!result.updated) {
+      setPlaceCalloutMessage(result.message || "Could not remove honor joke.");
+      return;
+    }
+    setPlaceCalloutMessage(result.message || `${placeLabel} joke removed.`);
+    setPlaceCalloutDrafts((previous) => ({ ...previous, [place.id]: "" }));
+    refresh();
   };
 
   const readFileAsDataUrl = (file) => {
@@ -400,6 +452,16 @@ export default function AdminPage() {
       return;
     }
     setMessage(result.isClosed ? "Place marked as closed." : "Place reopened.");
+    refresh();
+  };
+
+  const onPlaceHostChange = (placeId, hostUserId) => {
+    const result = setPlaceHost(placeId, hostUserId || "");
+    if (!result?.updated) {
+      setMessage(result?.message || "Could not set host.");
+      return;
+    }
+    setMessage(result.hostUserId ? "Host assigned." : "Host cleared.");
     refresh();
   };
 
@@ -798,6 +860,7 @@ export default function AdminPage() {
 
         <section className={styles.panel}>
           <p className={styles.badge}>Places</p>
+          {placeCalloutMessage ? <p className={styles.message}>{placeCalloutMessage}</p> : null}
           <div className={styles.placeList}>
             {places.map((place) => (
               <article key={place.id} className={styles.placeRow}>
@@ -810,6 +873,22 @@ export default function AdminPage() {
                   ) : (
                     <span className={styles.userMeta}>status: active</span>
                   )}
+                  <label className={styles.placeHostRow}>
+                    Chosen by
+                    <select
+                      value={place.hostUserId || ""}
+                      onChange={(event) => onPlaceHostChange(place.id, event.target.value)}
+                      className={styles.placeHostSelect}
+                    >
+                      <option value="">— Unassigned —</option>
+                      <option value="all">All</option>
+                      {configuredUsers.map((user) => (
+                        <option key={`host-${place.id}-${user.id}`} value={user.id}>
+                          {user.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
                   <button
                     type="button"
                     className={styles.textButton}
@@ -817,6 +896,30 @@ export default function AdminPage() {
                   >
                     {place.isClosed ? "Reopen this venue" : "Mark as closed"}
                   </button>
+                </div>
+                <label className={styles.placeCalloutRowLabel}>
+                  Honor joke
+                  <textarea
+                    className={styles.placeCalloutTextArea}
+                    value={placeCalloutDrafts[place.id] || ""}
+                    onChange={(event) => onCalloutInputChange(place.id, event.target.value)}
+                    rows={2}
+                    placeholder="Add/edit joke for this place"
+                  />
+                </label>
+                <div className={styles.placeCalloutActions}>
+                  <button type="button" onClick={() => onSavePlaceCallout(place)}>
+                    Save
+                  </button>
+                  {Boolean(getCustomPlaceHint(place.name)) ? (
+                    <button
+                      type="button"
+                      className={styles.textButton}
+                      onClick={() => onDeletePlaceCallout(place)}
+                    >
+                      Remove
+                    </button>
+                  ) : null}
                 </div>
               </article>
             ))}

@@ -28,6 +28,8 @@ const RAW_PLACE_HINTS = {
   "regaulr sauce": "Hint: this one tries to sneak into the center of the table, and gets a little offended when it can't."
 };
 
+const CUSTOM_HINTS_STORAGE_KEY = "flatbread-custom-place-hints-v1";
+
 const CANONICAL_LABELS = {
   "ignazio's": "Ignazio's",
   "zazzy's pizza": "Zazzy's Pizza",
@@ -69,6 +71,83 @@ function cleanText(value) {
     .trim();
 }
 
+function getCustomPlaceHintsStorage() {
+  if (typeof window === "undefined") {
+    return {};
+  }
+
+  try {
+    const raw = window.localStorage.getItem(CUSTOM_HINTS_STORAGE_KEY);
+    if (!raw) {
+      return {};
+    }
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return {};
+    }
+    return parsed;
+  } catch {
+    return {};
+  }
+}
+
+function setCustomPlaceHintsStorage(nextHints) {
+  if (typeof window === "undefined") {
+    return;
+  }
+  try {
+    window.localStorage.setItem(CUSTOM_HINTS_STORAGE_KEY, JSON.stringify(nextHints || {}));
+  } catch {
+    return;
+  }
+}
+
+function getCustomPlaceHintMap() {
+  const stored = getCustomPlaceHintsStorage();
+  const cleaned = {};
+  Object.entries(stored).forEach(([normalizedKey, payload]) => {
+    const normalized = normalizePlaceHintKey(normalizedKey);
+    if (!normalized) {
+      return;
+    }
+
+    if (typeof payload === "string") {
+      const text = payload.trim();
+      if (text) {
+        cleaned[normalized] = {
+          display: rawLabelFromNormalized(normalized),
+          hint: text
+        };
+      }
+      return;
+    }
+
+    if (payload && typeof payload === "object" && typeof payload.hint === "string") {
+      const hint = payload.hint.trim();
+      if (!hint) {
+        return;
+      }
+      const rawDisplay = String(payload.display || "").trim();
+      cleaned[normalized] = {
+        display: rawDisplay || rawLabelFromNormalized(normalized),
+        hint
+      };
+    }
+  });
+  return cleaned;
+}
+
+function rawLabelFromNormalized(normalized) {
+  if (!normalized) {
+    return "";
+  }
+  return normalized
+    .split(" ")
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
 export function normalizePlaceHintKey(value) {
   return cleanText(value);
 }
@@ -108,6 +187,11 @@ export function getPlaceHintText(rawName) {
     return "";
   }
 
+  const customHints = getCustomPlaceHintMap();
+  if (customHints[normalized]?.hint) {
+    return customHints[normalized].hint;
+  }
+
   if (HINT_LOOKUP[normalized]) {
     return HINT_LOOKUP[normalized];
   }
@@ -127,6 +211,73 @@ export function getPlaceHintText(rawName) {
   }
 
   return "";
+}
+
+export function getCustomPlaceHintsList() {
+  const customHints = getCustomPlaceHintMap();
+  return Object.entries(customHints)
+    .map(([normalized, payload]) => ({
+      normalized,
+      display: payload.display || rawLabelFromNormalized(normalized),
+      hint: payload.hint || ""
+    }))
+    .filter((entry) => entry.hint)
+    .sort((left, right) => left.display.localeCompare(right.display, undefined, { sensitivity: "base" }));
+}
+
+export function getCustomPlaceHint(rawName) {
+  const normalized = normalizePlaceHintKey(rawName);
+  if (!normalized) {
+    return "";
+  }
+  const customHints = getCustomPlaceHintMap();
+  return customHints[normalized]?.hint || "";
+}
+
+export function saveCustomPlaceHint(placeName, hint) {
+  const normalized = normalizePlaceHintKey(placeName);
+  const trimmedName = String(placeName || "").trim();
+  const trimmedHint = String(hint || "").trim();
+  if (!normalized || !trimmedName || !trimmedHint) {
+    return {
+      updated: false,
+      message: "Place name and hint are both required."
+    };
+  }
+
+  const nextHints = getCustomPlaceHintMap();
+  nextHints[normalized] = {
+    display: trimmedName,
+    hint: trimmedHint
+  };
+  setCustomPlaceHintsStorage(nextHints);
+  return {
+    updated: true,
+    message: "Honor joke saved."
+  };
+}
+
+export function removeCustomPlaceHint(normalizedOrDisplay) {
+  const normalized = normalizePlaceHintKey(normalizedOrDisplay);
+  if (!normalized) {
+    return {
+      updated: false,
+      message: "Could not find that honor joke."
+    };
+  }
+  const nextHints = getCustomPlaceHintMap();
+  if (!nextHints[normalized]) {
+    return {
+      updated: false,
+      message: "Could not find that honor joke."
+    };
+  }
+  delete nextHints[normalized];
+  setCustomPlaceHintsStorage(nextHints);
+  return {
+    updated: true,
+    message: "Honor joke removed."
+  };
 }
 
 function canonicalOrderKey(text) {
@@ -158,6 +309,31 @@ export function getPlaceHintEntries() {
     seen.add(entry.display.toLowerCase());
     deduped.push(entry);
   }
+  deduped.sort((left, right) => canonicalOrderKey(left.display).localeCompare(canonicalOrderKey(right.display)));
+  const customHints = getCustomPlaceHintMap();
+  for (const [normalized, payload] of Object.entries(customHints)) {
+    const display = payload.display || rawLabelFromNormalized(normalized);
+    const normalizedDisplay = normalizePlaceHintKey(display);
+    if (!display || !payload.hint) {
+      continue;
+    }
+
+    const existingIndex = deduped.findIndex((entry) => normalizePlaceHintKey(entry.normalized) === normalizedDisplay);
+    if (existingIndex >= 0) {
+      deduped[existingIndex] = {
+        normalized,
+        display,
+        hint: payload.hint
+      };
+      continue;
+    }
+    deduped.push({
+      normalized,
+      display,
+      hint: payload.hint
+    });
+  }
+
   deduped.sort((left, right) => canonicalOrderKey(left.display).localeCompare(canonicalOrderKey(right.display)));
   return deduped;
 }
