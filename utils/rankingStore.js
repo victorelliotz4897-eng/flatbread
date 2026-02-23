@@ -349,7 +349,19 @@ export async function hydrateUsersFromServer() {
 function applyDbPlaceUpdatesFromServer(nextDbPlaces) {
   const normalized = normalizeDbPlacesPayload(nextDbPlaces);
   const previous = cachedDbPlaces;
-  const changed = normalized.length !== previous.length || normalized.some((place, index) => previous[index]?.id !== place.id || previous[index]?.date !== place.date || previous[index]?.name !== place.name);
+  const changed = normalized.length !== previous.length || normalized.some((place, index) => {
+    const prior = previous[index] || {};
+    return prior.id !== place.id
+      || prior.name !== place.name
+      || prior.date !== place.date
+      || prior.isClosed !== place.isClosed
+      || prior.host_user_id !== place.host_user_id
+      || prior.hostUserId !== place.hostUserId
+      || prior.address !== place.address
+      || String(prior.lat) !== String(place.lat)
+      || String(prior.lng) !== String(place.lng)
+      || prior.orderedItems !== place.orderedItems;
+  });
   cachedDbPlaces = normalized;
   dbPlacesHydrated = true;
   if (changed) {
@@ -1132,7 +1144,13 @@ function allChronologicalPlaces(state) {
     ...place,
     source: "db"
   }));
-  const closedSet = new Set(normalizePlaceIdList(state.places?.[PLACE_STATE_CLOSED_KEY]));
+  const localClosedSet = new Set(normalizePlaceIdList(state.places?.[PLACE_STATE_CLOSED_KEY]));
+  const dbClosedSet = new Set(
+    dbPlaces
+      .map((place) => (place?.isClosed ? place.id : ""))
+      .filter(Boolean)
+  );
+  const closedSet = new Set([...localClosedSet, ...dbClosedSet]);
   const hostMap = state.places?.[PLACE_HOST_MAP_KEY] || {};
   const orderNotes = normalizePlaceOrderNotes(state.places?.[PLACE_ORDER_NOTES_KEY]);
   const staticPlaces = flatbreadLocations.map(hydrateBasePlace);
