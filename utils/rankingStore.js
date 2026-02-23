@@ -1184,14 +1184,23 @@ function allChronologicalPlacesForUser(state, userId) {
   const allPlaces = allChronologicalPlaces(state);
   const targetUserId = safeString(userId);
   return allPlaces.filter((place) => {
-    const targetUsers = normalizeStringList(place?.targetUsers);
+    const targetUsers = normalizeStringList(place?.targetUsers)
+      .map((id) => normalizeId(id))
+      .filter(Boolean);
+
     if (targetUsers.length === 0) {
       return true;
     }
+
+    const knownTargetUsers = targetUsers.filter(isKnownUserId);
+    if (knownTargetUsers.length === 0) {
+      return true;
+    }
+
     if (!targetUserId) {
       return false;
     }
-    return targetUsers.includes(targetUserId);
+    return knownTargetUsers.includes(targetUserId);
   });
 }
 
