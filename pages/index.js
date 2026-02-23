@@ -9,8 +9,7 @@ import {
   LANDING_GAME_KEY,
   getFlatbreadMonthCount
 } from "../data/config";
-import { flatbreadLocations } from "../data/locations";
-import { getAllPlaces, getConfiguredUsers } from "../utils/rankingStore";
+import { getAllPlaces, getConfiguredUsers, PLACE_LIST_SYNC_EVENT, hydratePlacesFromServer } from "../utils/rankingStore";
 import styles from "../styles/Home.module.css";
 
 const FlatbreadMap = dynamic(() => import("../components/FlatbreadMap"), {
@@ -85,7 +84,7 @@ function makeSliceDeck(seedBase) {
 
 export default function HomePage() {
   const isLandingReplay = false;
-  const [locations, setLocations] = useState(flatbreadLocations);
+  const [locations, setLocations] = useState(() => getAllPlaces());
   const [configuredUsers, setConfiguredUsers] = useState(() => getConfiguredUsers());
   const [gameUnlocked, setGameUnlocked] = useState(false);
   const [gameLoaded, setGameLoaded] = useState(false);
@@ -121,6 +120,11 @@ export default function HomePage() {
   };
 
   useEffect(() => {
+    const refreshLocations = async () => {
+      await hydratePlacesFromServer();
+      setLocations(getAllPlaces());
+    };
+
     const readUnlockState = () => {
       if (isLandingReplayRequested()) {
         clearLandingState();
@@ -131,12 +135,20 @@ export default function HomePage() {
       setLandingStarted(true);
     };
 
+    refreshLocations();
+    setConfiguredUsers(getConfiguredUsers());
     readUnlockState();
     setGameLoaded(true);
-    setLocations(getAllPlaces());
-    setConfiguredUsers(getConfiguredUsers());
+    window.addEventListener(PLACE_LIST_SYNC_EVENT, refreshLocations);
+    const removeHandler = () => {
+      window.removeEventListener(PLACE_LIST_SYNC_EVENT, refreshLocations);
+    };
+
     window.addEventListener("storage", readUnlockState);
-    return () => window.removeEventListener("storage", readUnlockState);
+    return () => {
+      removeHandler();
+      window.removeEventListener("storage", readUnlockState);
+    };
   }, []);
 
   const startLandingGame = (event) => {

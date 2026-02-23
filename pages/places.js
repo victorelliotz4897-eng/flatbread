@@ -1,7 +1,7 @@
 import Head from "next/head";
 import { useEffect, useState } from "react";
 import SiteNav from "../components/SiteNav";
-import { getAllPlaces, getConfiguredUsers } from "../utils/rankingStore";
+import { getAllPlaces, getConfiguredUsers, PLACE_LIST_SYNC_EVENT, hydratePlacesFromServer } from "../utils/rankingStore";
 import styles from "../styles/Places.module.css";
 
 const PLACE_HOST_ALL_LABEL = "All";
@@ -46,7 +46,17 @@ export default function PlacesPage() {
   const [places, setPlaces] = useState(() => normalizePlaces());
 
   useEffect(() => {
-    setPlaces(normalizePlaces());
+    const refreshPlaces = async () => {
+      await hydratePlacesFromServer();
+      setPlaces(normalizePlaces());
+    };
+
+    void refreshPlaces();
+    window.addEventListener(PLACE_LIST_SYNC_EVENT, refreshPlaces);
+
+    return () => {
+      window.removeEventListener(PLACE_LIST_SYNC_EVENT, refreshPlaces);
+    };
   }, []);
 
   return (

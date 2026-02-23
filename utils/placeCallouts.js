@@ -28,7 +28,6 @@ const RAW_PLACE_HINTS = {
   "regaulr sauce": "Hint: this one tries to sneak into the center of the table, and gets a little offended when it can't."
 };
 
-const CUSTOM_HINTS_STORAGE_KEY = "flatbread-custom-place-hints-v1";
 const APP_STATE_SYNC_ENDPOINT = "/api/app-state";
 
 const CANONICAL_LABELS = {
@@ -72,35 +71,16 @@ function cleanText(value) {
     .trim();
 }
 
-function getCustomPlaceHintsStorage() {
-  if (typeof window === "undefined") {
-    return {};
-  }
-
-  try {
-    const raw = window.localStorage.getItem(CUSTOM_HINTS_STORAGE_KEY);
-    if (!raw) {
-      return {};
-    }
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      return {};
-    }
-    return parsed;
-  } catch {
-    return {};
-  }
-}
+let customPlaceHintCache = null;
+let customPlaceHintHydrationPromise = null;
 
 function setCustomPlaceHintsStorage(nextHints) {
-  if (typeof window === "undefined") {
-    return;
+  if (!nextHints || typeof nextHints !== "object" || Array.isArray(nextHints)) {
+    customPlaceHintCache = {};
+    return customPlaceHintCache;
   }
-  try {
-    window.localStorage.setItem(CUSTOM_HINTS_STORAGE_KEY, JSON.stringify(nextHints || {}));
-  } catch {
-    return;
-  }
+  customPlaceHintCache = formatHintsForSync(nextHints);
+  return customPlaceHintCache;
 }
 
 async function syncCustomHintsToServer(nextHints) {
@@ -173,28 +153,40 @@ export async function hydrateCustomPlaceHintsFromServer() {
     return null;
   }
 
-  try {
-    const response = await fetch(APP_STATE_SYNC_ENDPOINT);
-    if (!response.ok) {
-      return null;
-    }
-
-    const payload = await response.json();
-    const remote = payload?.jokes;
-    const normalized = formatHintsForSync(remote);
-    if (Object.keys(normalized).length > 0) {
-      setCustomPlaceHintsStorage(normalized);
-      return normalized;
-    }
-  } catch {
-    return null;
+  if (customPlaceHintHydrationPromise) {
+    return customPlaceHintHydrationPromise;
   }
 
-  return null;
+  customPlaceHintHydrationPromise = (async () => {
+    try {
+      const response = await fetch(APP_STATE_SYNC_ENDPOINT);
+      if (!response.ok) {
+        return customPlaceHintCache || null;
+      }
+
+      const payload = await response.json();
+      const remote = payload?.jokes;
+      const normalized = formatHintsForSync(remote);
+      if (Object.keys(normalized).length > 0) {
+        return setCustomPlaceHintsStorage(normalized);
+      }
+      return customPlaceHintCache || {};
+    } catch {
+      return customPlaceHintCache || null;
+    }
+  })();
+
+  try {
+    return await customPlaceHintHydrationPromise;
+  } catch {
+    return customPlaceHintCache || null;
+  } finally {
+    customPlaceHintHydrationPromise = null;
+  }
 }
 
 function getCustomPlaceHintMap() {
-  const stored = getCustomPlaceHintsStorage();
+  const stored = customPlaceHintCache || {};
   const cleaned = {};
   Object.entries(stored).forEach(([normalizedKey, payload]) => {
     const normalized = normalizePlaceHintKey(normalizedKey);

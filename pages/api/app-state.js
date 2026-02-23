@@ -55,7 +55,8 @@ async function readAppState() {
   const data = await response.json();
   const state = {
     places: null,
-    jokes: null
+    jokes: null,
+    users: null
   };
 
   if (!Array.isArray(data)) {
@@ -71,6 +72,8 @@ async function readAppState() {
       state.places = row.payload;
     } else if (key === "jokes") {
       state.jokes = row.payload;
+    } else if (key === "users") {
+      state.users = row.payload;
     }
   }
 
@@ -130,8 +133,9 @@ export default async function handler(req, res) {
 
     const places = sanitizePayload(body?.places);
     const jokes = sanitizePayload(body?.jokes);
+    const users = sanitizePayload(body?.users);
 
-    if (!places && !jokes) {
+    if (!places && !jokes && !users) {
       return jsonError(res, 400, "Nothing to save in request body.");
     }
 
@@ -142,6 +146,9 @@ export default async function handler(req, res) {
       }
       if (jokes) {
         jobs.push(upsertStateRow("jokes", jokes));
+      }
+      if (users) {
+        jobs.push(upsertStateRow("users", users));
       }
       await Promise.all(jobs);
 

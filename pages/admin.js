@@ -14,7 +14,11 @@ import {
   setPlaceHost,
   resetAllRankings,
   togglePlaceClosedState,
-  setPlaceOrderedItems
+  setPlaceOrderedItems,
+  PLACE_LIST_SYNC_EVENT,
+  hydratePlacesFromServer,
+  hydrateUsersFromServer,
+  hydrateUserRankingStateFromServer
 } from "../utils/rankingStore";
 import styles from "../styles/Admin.module.css";
 import { LANDING_GAME_KEY as ADMIN_LANDING_GAME_KEY } from "../data/config";
@@ -130,21 +134,28 @@ export default function AdminPage() {
     });
   };
 
-  const refresh = () => {
+  const refresh = async () => {
     try {
+      await hydrateUsersFromServer();
       const nextPlaces = getAllPlaces();
       setPlaces(nextPlaces);
       setPendingUsers(getUsersPendingCounts());
+
       const usersWithPasswords = getConfiguredUsersWithPasswords();
       setConfiguredUsers(usersWithPasswords);
-      const nextRankingColumns = usersWithPasswords.map((user) => {
-        const snapshot = getRankingSession(user.id);
+
+      const rankingSnapshots = await Promise.all(
+        usersWithPasswords.map((user) => hydrateUserRankingStateFromServer(user.id))
+      );
+
+      const nextRankingColumns = usersWithPasswords.map((user, index) => {
+        const snapshot = rankingSnapshots[index] || getRankingSession(user.id);
         const rankedPlaces = Array.isArray(snapshot?.ranked)
-          ? snapshot.ranked.map((place, index) => ({
-              id: place.id || `${user.id}-${index}`,
+          ? snapshot.ranked.map((place, placeIndex) => ({
+              id: place.id || `${user.id}-${placeIndex}`,
               name: place.name || "Unknown place",
               date: place.date || "",
-              rank: index + 1
+              rank: placeIndex + 1
             }))
           : [];
         return {
@@ -155,6 +166,7 @@ export default function AdminPage() {
         };
       });
       setRankingColumns(nextRankingColumns);
+
       setUserPasswordInputs((previous) => {
         const next = { ...previous };
         usersWithPasswords.forEach((user) => {
@@ -164,11 +176,13 @@ export default function AdminPage() {
         });
         return next;
       });
+
       const nextDrafts = {};
       nextPlaces.forEach((place) => {
         nextDrafts[place.id] = getPlaceHintText(place.name);
       });
       setPlaceCalloutDrafts(nextDrafts);
+
       const nextOrderDrafts = {};
       nextPlaces.forEach((place) => {
         nextOrderDrafts[place.id] = place.orderedItems || "";
@@ -185,7 +199,15 @@ export default function AdminPage() {
   };
 
   useEffect(() => {
-    refresh();
+    const refreshFromServer = async () => {
+      await hydratePlacesFromServer();
+      await refresh();
+    };
+    refreshFromServer();
+    window.addEventListener(PLACE_LIST_SYNC_EVENT, refreshFromServer);
+    return () => {
+      window.removeEventListener(PLACE_LIST_SYNC_EVENT, refreshFromServer);
+    };
   }, []);
 
   useEffect(() => {

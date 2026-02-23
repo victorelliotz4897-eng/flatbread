@@ -1,6 +1,6 @@
 import Head from "next/head";
 import SiteNav from "../components/SiteNav";
-import { getClosedPlaces, getConfiguredUsers } from "../utils/rankingStore";
+import { getClosedPlaces, getConfiguredUsers, PLACE_LIST_SYNC_EVENT, hydratePlacesFromServer } from "../utils/rankingStore";
 import styles from "../styles/Tombstones.module.css";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -109,15 +109,24 @@ export default function TombstonesPage() {
   }, [hydrated]);
 
   useEffect(() => {
-    const places = getClosedPlaces().sort((a, b) => a.visitDate - b.visitDate);
-    setClosedPlaces(places);
-    const users = getConfiguredUsers();
-    const nextUsersById = {};
-    for (const user of users) {
-      nextUsersById[user.id] = user.name;
-    }
-    setUsersById(nextUsersById);
-    setHydrated(true);
+    const refreshClosedPlaces = async () => {
+      await hydratePlacesFromServer();
+      const places = getClosedPlaces().sort((a, b) => a.visitDate - b.visitDate);
+      setClosedPlaces(places);
+      const users = getConfiguredUsers();
+      const nextUsersById = {};
+      for (const user of users) {
+        nextUsersById[user.id] = user.name;
+      }
+      setUsersById(nextUsersById);
+      setHydrated(true);
+    };
+
+    void refreshClosedPlaces();
+    window.addEventListener(PLACE_LIST_SYNC_EVENT, refreshClosedPlaces);
+    return () => {
+      window.removeEventListener(PLACE_LIST_SYNC_EVENT, refreshClosedPlaces);
+    };
   }, []);
 
   const hasClosedPlaces = useMemo(() => hydrated && closedPlaces.length > 0, [hydrated, closedPlaces]);

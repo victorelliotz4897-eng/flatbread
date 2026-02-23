@@ -1,7 +1,15 @@
 import Head from "next/head";
 import { useEffect, useMemo, useState } from "react";
 import SiteNav from "../components/SiteNav";
-import { getAllPlaces, getConfiguredUsers, getRankingSession } from "../utils/rankingStore";
+import {
+  getAllPlaces,
+  getConfiguredUsers,
+  getRankingSession,
+  PLACE_LIST_SYNC_EVENT,
+  hydratePlacesFromServer,
+  hydrateUsersFromServer,
+  hydrateUserRankingStateFromServer
+} from "../utils/rankingStore";
 import styles from "../styles/HighFives.module.css";
 
 function normalizeForMatch(value) {
@@ -45,97 +53,120 @@ export default function HighFivesPage() {
   const [highFive, setHighFive] = useState(null);
 
   useEffect(() => {
-    const configuredUsers = getConfiguredUsers().sort((left, right) => left.name.localeCompare(right.name));
-    const seenUserIds = new Set();
-    const places = getAllPlaces();
-    const allPlacesById = new Map(places.map((place) => [place.id, place]));
-    const allPlacesByName = new Map(
-      places
-        .map((place) => [normalizeForMatch(place.name || place.normalized || place.id), place])
-        .filter(([name]) => Boolean(name))
-    );
+    const refreshMatches = async () => {
+      await Promise.all([
+        hydratePlacesFromServer(),
+        hydrateUsersFromServer()
+      ]);
 
-    const userRankings = configuredUsers
-      .map((user) => {
-        const snapshot = getRankingSession(user.id);
-        return {
-          id: user.id,
-          name: user.name,
-          phase: snapshot?.phase,
-          totalPlaces: Number(snapshot?.totalPlaces) || 0,
-          ranked: Array.isArray(snapshot?.ranked) ? snapshot.ranked : []
-        };
-      })
-      .filter((entry) => !entry.phase || entry.phase !== "empty");
-
-    const cleanRankings = userRankings.filter((entry) => {
-      if (!entry.id || seenUserIds.has(entry.id)) {
-        return false;
-      }
-      if (!entry.ranked || entry.ranked.length === 0) {
-        return false;
-      }
-      if (entry.phase === "empty" || entry.phase === "landing") {
-        return false;
-      }
-      seenUserIds.add(entry.id);
-      return true;
-    });
-
-    const eligibleUsers = cleanRankings;
-
-    const matchMap = new Map();
-
-    eligibleUsers.forEach((entry) => {
-      entry.ranked.forEach((place, rankIndex) => {
-        const placeKey = getMatchPlaceKey(place);
-        const placeName = getMatchPlaceName(place);
-        if (!placeKey && !placeName) {
+      const configuredUsers = getConfiguredUsers()
+        .sort((left, right) => left.name.localeCompare(right.name))
+        .filter((user) => Boolean(user && user.id));
+      const uniqueUsers = [];
+      const seenIds = new Set();
+      configuredUsers.forEach((user) => {
+        if (seenIds.has(user.id)) {
           return;
         }
-        const lookupKey = place?.id ? `id:${place.id}` : `name:${normalizeForMatch(placeName)}`;
-        const key = `${lookupKey}::${rankIndex}`;
-        const existing = matchMap.get(key);
-        if (existing) {
-          existing.users.push(entry.name);
-          return;
-        }
+        seenIds.add(user.id);
+        uniqueUsers.push(user);
+      });
 
-        matchMap.set(key, {
-          key,
-          placeId: place.id,
-          placeNameFallback: placeName,
-          placeNameLookup: normalizeForMatch(placeName),
-          rankIndex,
-          users: [entry.name]
+      const userRankings = await Promise.all(
+        uniqueUsers.map(async (user) => {
+          const snapshot = await hydrateUserRankingStateFromServer(user.id).catch(() => getRankingSession(user.id));
+          return {
+            id: user.id,
+            name: user.name,
+            phase: snapshot?.phase,
+            ranked: Array.isArray(snapshot?.ranked) ? snapshot.ranked : []
+          };
+        })
+      );
+
+      const places = getAllPlaces();
+      const allPlacesById = new Map(places.map((place) => [place.id, place]));
+      const allPlacesByName = new Map(
+        places
+          .map((place) => [normalizeForMatch(place.name || place.normalized || place.id), place])
+          .filter(([name]) => Boolean(name))
+      );
+
+      const cleanRankings = userRankings
+        .filter((entry) => {
+          if (!entry.id) {
+            return false;
+          }
+          if (!entry.ranked || entry.ranked.length === 0) {
+            return false;
+          }
+          if (entry.phase === "empty" || entry.phase === "landing") {
+            return false;
+          }
+          return true;
+        });
+
+      const eligibleUsers = cleanRankings;
+      const matchMap = new Map();
+
+      eligibleUsers.forEach((entry) => {
+        entry.ranked.forEach((place, rankIndex) => {
+          const placeKey = getMatchPlaceKey(place);
+          const placeName = getMatchPlaceName(place);
+          if (!placeKey && !placeName) {
+            return;
+          }
+          const lookupKey = place?.id ? `id:${place.id}` : `name:${normalizeForMatch(placeName)}`;
+          const key = `${lookupKey}::${rankIndex}`;
+          const existing = matchMap.get(key);
+          if (existing) {
+            existing.users.push(entry.name);
+            return;
+          }
+
+          matchMap.set(key, {
+            key,
+            placeId: place.id,
+            placeNameFallback: placeName,
+            placeNameLookup: normalizeForMatch(placeName),
+            rankIndex,
+            users: [entry.name]
+          });
         });
       });
-    });
 
-    const parsedMatches = Array.from(matchMap.values())
-      .filter((match) => match.users.length >= 2)
-      .map((match) => {
-        const place = match.placeId
-          ? normalizePlaceList(allPlacesById, match.placeId)
-          : null;
-        const placeByName = allPlacesByName.get(match.placeNameLookup || "");
-        const sortedUsers = match.users.slice().sort((left, right) => left.localeCompare(right));
-        return {
-          ...match,
-          placeName: place?.name || placeByName?.name || match.placeNameFallback || "Unknown place",
-          placeDate: place?.date || placeByName?.date || "",
-          users: sortedUsers,
-          userLabel: getOrdinalForUserMatch(sortedUsers)
-        };
-      })
-      .sort((left, right) => {
-        if (left.rankIndex !== right.rankIndex) {
-          return left.rankIndex - right.rankIndex;
-        }
-        return left.placeName.localeCompare(right.placeName);
-      });
+      const parsedMatches = Array.from(matchMap.values())
+        .filter((match) => match.users.length >= 2)
+        .map((match) => {
+          const place = match.placeId
+            ? normalizePlaceList(allPlacesById, match.placeId)
+            : null;
+          const placeByName = allPlacesByName.get(match.placeNameLookup || "");
+          const sortedUsers = match.users.slice().sort((left, right) => left.localeCompare(right));
+          return {
+            ...match,
+            placeName: place?.name || placeByName?.name || match.placeNameFallback || "Unknown place",
+            placeDate: place?.date || placeByName?.date || "",
+            users: sortedUsers,
+            userLabel: getOrdinalForUserMatch(sortedUsers)
+          };
+        })
+        .sort((left, right) => {
+          if (left.rankIndex !== right.rankIndex) {
+            return left.rankIndex - right.rankIndex;
+          }
+          return left.placeName.localeCompare(right.placeName);
+        });
 
-    setMatches(parsedMatches);
+      setMatches(parsedMatches);
+    };
+
+    refreshMatches();
+    window.addEventListener(PLACE_LIST_SYNC_EVENT, refreshMatches);
+
+    return () => {
+      window.removeEventListener(PLACE_LIST_SYNC_EVENT, refreshMatches);
+    };
   }, []);
 
   const hasMatches = matches.length > 0;

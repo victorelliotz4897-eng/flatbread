@@ -1,5 +1,9 @@
 import { useEffect, useState } from "react";
-import { hydrateAppStateFromServer } from "../utils/rankingStore";
+import {
+  hydrateAppStateFromServer,
+  hydratePlacesFromServer,
+  hydrateUsersFromServer
+} from "../utils/rankingStore";
 import { hydrateCustomPlaceHintsFromServer } from "../utils/placeCallouts";
 import "../styles/globals.css";
 
@@ -19,8 +23,12 @@ export default function App({ Component, pageProps }) {
     if (typeof window === "undefined") {
       return;
     }
-    void hydrateAppStateFromServer();
-    void hydrateCustomPlaceHintsFromServer();
+    void Promise.all([
+      hydrateAppStateFromServer(),
+      hydratePlacesFromServer(),
+      hydrateUsersFromServer(),
+      hydrateCustomPlaceHintsFromServer()
+    ]);
 
     const onDocumentClick = (event) => {
       const trigger = event.target?.closest?.("[data-honor-trigger='true']");

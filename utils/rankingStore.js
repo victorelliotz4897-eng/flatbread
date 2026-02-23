@@ -1,15 +1,21 @@
 import { flatbreadLocations } from "../data/locations";
-
-const STORAGE_KEY = "flatbread-ranking-state-v1";
 const SCHEMA_VERSION = 1;
 const RANKING_SYNC_ENDPOINT = "/api/rankings";
 const APP_STATE_SYNC_ENDPOINT = "/api/app-state";
-const TEST_USER_LIST_KEY = "flatbread-test-user-accounts-v1";
-const USER_PASSWORDS_KEY = "flatbread-user-passwords-v1";
+const PLACES_SYNC_ENDPOINT = "/api/places";
 const PLACE_STATE_CLOSED_KEY = "closedPlaceIds";
 const PLACE_HOST_MAP_KEY = "hostByPlaceId";
 const PLACE_ORDER_NOTES_KEY = "orderedItemsByPlaceId";
 const PLACE_HOST_ALL = "all";
+export const PLACE_LIST_SYNC_EVENT = "flatbread-places-sync";
+const USERS_STATE_KEY = "users";
+
+let cachedDbPlaces = [];
+let dbPlacesHydrationPromise = null;
+let dbPlacesHydrated = false;
+let usersStateHydrationPromise = null;
+let usersStateCache = null;
+let stateCache = null;
 
 const DEFAULT_USER_PASSWORDS = {
   victor: "robertas",
@@ -126,6 +132,282 @@ function parseDate(value) {
   };
 }
 
+function emitPlaceListChange() {
+  if (typeof window === "undefined") {
+    return;
+  }
+  try {
+    window.dispatchEvent(new Event(PLACE_LIST_SYNC_EVENT));
+  } catch {
+    // no-op
+  }
+}
+
+function normalizeDbPlacesPayload(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  const places = [];
+  const seen = new Set();
+
+  for (const raw of value) {
+    if (!raw || typeof raw !== "object") {
+      continue;
+    }
+
+    const derivedId = safePlaceId(raw.id, raw.name, raw.date_raw || raw.date);
+    const id = safeString(derivedId);
+    if (!id || seen.has(id)) {
+      continue;
+    }
+    const parsed = parseDate(raw.date_raw || raw.date);
+    const visitDate = raw.visit_date ? nowAsDate(raw.visit_date) : parsed.visitDate;
+    const name = normalizeText(raw.name);
+    const date = normalizeText(raw.date) || parsed.display;
+    if (!name) {
+      continue;
+    }
+
+    seen.add(id);
+    places.push({
+      id,
+      name,
+      date,
+      dateRaw: normalizeText(raw.date_raw || raw.date),
+      address: normalizeText(raw.address),
+      lat: Number(raw.lat),
+      lng: Number(raw.lng),
+      visitDate,
+      source: "db",
+      targetUsers: [],
+      hostUserId: safeString(raw.host_user_id),
+      orderedItems: safeString(raw.ordered_items),
+      isClosed: raw.is_closed === true
+    });
+  }
+
+  return places;
+}
+
+function safePlaceId(rawId, rawName, rawDate) {
+  const normalizedId = safeString(rawId);
+  if (normalizedId) {
+    return normalizedId;
+  }
+
+  const name = normalizeText(rawName);
+  const date = normalizeText(rawDate);
+  if (!name || !date) {
+    return "";
+  }
+
+  return `${name.toLowerCase()}::${date}`.normalize("NFKC");
+}
+
+function normalizeUserPasswordMap(rawPasswords) {
+  if (!rawPasswords || typeof rawPasswords !== "object" || Array.isArray(rawPasswords)) {
+    return {};
+  }
+  const output = {};
+  Object.entries(rawPasswords).forEach(([key, value]) => {
+    const normalizedKey = normalizeId(key);
+    const normalizedValue = normalizePassword(safeString(value));
+    if (!normalizedKey || !normalizedValue) {
+      return;
+    }
+    output[normalizedKey] = normalizedValue;
+  });
+  return output;
+}
+
+function getDefaultUsersState() {
+  return {
+    customUsers: [],
+    passwords: {
+      victor: DEFAULT_USER_PASSWORDS.victor || "",
+      jack_dweck: DEFAULT_USER_PASSWORDS.jack_dweck || "",
+      jack_sasson: DEFAULT_USER_PASSWORDS.jack_sasson || "",
+      aaron: DEFAULT_USER_PASSWORDS.aaron || ""
+    }
+  };
+}
+
+function getUsersState() {
+  if (!usersStateCache) {
+    usersStateCache = getDefaultUsersState();
+  }
+  return usersStateCache;
+}
+
+function mergeConfiguredUsersIntoState(state) {
+  if (!state || typeof state !== "object") {
+    return;
+  }
+
+  const configuredUsers = getConfiguredUserList();
+  const configuredIds = new Set(configuredUsers.map((user) => user.id));
+
+  Object.keys(state.users || {}).forEach((userId) => {
+    if (!configuredIds.has(userId)) {
+      delete state.users[userId];
+    }
+  });
+
+  configuredUsers.forEach((user) => {
+    ensureUser(state, user.id);
+  });
+}
+
+function setUsersState(next) {
+  const normalized = {
+    customUsers: parseCustomUsers(next?.customUsers),
+    passwords: normalizeUserPasswordMap(next?.passwords)
+  };
+
+  usersStateCache = {
+    ...getDefaultUsersState(),
+    customUsers: normalized.customUsers,
+    passwords: {
+      ...getDefaultUsersState().passwords,
+      ...normalized.passwords
+    }
+  };
+
+  return usersStateCache;
+}
+
+function mapUsersStateForSync() {
+  const state = getUsersState();
+  return {
+    customUsers: state.customUsers || [],
+    passwords: state.passwords || {}
+  };
+}
+
+function syncUsersStateToServer(next) {
+  if (typeof window === "undefined") {
+    return;
+  }
+  const payload = mapUsersStateForSync(next);
+  const send = async () => {
+    const response = await fetch(APP_STATE_SYNC_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ [USERS_STATE_KEY]: payload }),
+      keepalive: true
+    });
+
+    if (!response.ok) {
+      const responseText = await response.text().catch(() => "");
+      console.warn("[flatbread-users-sync] failed", response.status, responseText);
+    }
+  };
+
+  try {
+    void send();
+  } catch {
+    // no-op
+  }
+}
+
+export async function hydrateUsersFromServer() {
+  if (typeof window === "undefined") {
+    return getUsersState();
+  }
+
+  if (usersStateHydrationPromise) {
+    return usersStateHydrationPromise;
+  }
+
+  usersStateHydrationPromise = (async () => {
+    try {
+      const response = await fetch(APP_STATE_SYNC_ENDPOINT);
+      if (!response.ok) {
+        return getUsersState();
+      }
+      const payload = await response.json();
+      const remote = payload?.users;
+      if (remote && typeof remote === "object" && !Array.isArray(remote)) {
+        return setUsersState(remote);
+      }
+      return getUsersState();
+    } catch {
+      return getUsersState();
+    }
+  })();
+
+  try {
+    const resolved = await usersStateHydrationPromise;
+    return resolved;
+  } finally {
+    usersStateHydrationPromise = null;
+  }
+}
+
+function applyDbPlaceUpdatesFromServer(nextDbPlaces) {
+  const normalized = normalizeDbPlacesPayload(nextDbPlaces);
+  const previous = cachedDbPlaces;
+  const changed = normalized.length !== previous.length || normalized.some((place, index) => previous[index]?.id !== place.id || previous[index]?.date !== place.date || previous[index]?.name !== place.name);
+  cachedDbPlaces = normalized;
+  dbPlacesHydrated = true;
+  if (changed) {
+    emitPlaceListChange();
+  }
+}
+
+export async function hydratePlacesFromServer() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  if (dbPlacesHydrationPromise) {
+    return dbPlacesHydrationPromise;
+  }
+
+  dbPlacesHydrationPromise = (async () => {
+    try {
+      const response = await fetch(PLACES_SYNC_ENDPOINT);
+      if (!response.ok) {
+        return;
+      }
+      const payload = await response.json().catch(() => ({}));
+      const places = Array.isArray(payload?.places)
+        ? payload.places
+        : Array.isArray(payload)
+          ? payload
+          : [];
+      applyDbPlaceUpdatesFromServer(places);
+    } catch {
+      // keep previous cache on failure
+    }
+  })()
+    .finally(() => {
+      dbPlacesHydrationPromise = null;
+    });
+
+  return dbPlacesHydrationPromise;
+}
+
+function getDbPlaces() {
+  return Array.isArray(cachedDbPlaces) ? cachedDbPlaces : [];
+}
+
+function allKnownPlaceIdsFromState(state) {
+  const custom = Array.isArray(state?.places?.custom) ? state.places.custom : [];
+  const ids = new Set([
+    ...flatbreadLocations.map((place) => safeString(place.id)).filter(Boolean),
+    ...getDbPlaces().map((place) => safeString(place.id)).filter(Boolean),
+    ...custom.map((place) => safeString(place?.id)).filter(Boolean)
+  ]);
+  return ids;
+}
+
+function dbPlaceListReady() {
+  return dbPlacesHydrated && Array.isArray(cachedDbPlaces);
+}
+
 function capitalizeMonth(monthText) {
   if (!monthText) return monthText;
   const normalized = normalizeText(monthText).toLowerCase();
@@ -201,6 +483,13 @@ function normalizeList(value) {
 }
 
 function safeString(value) {
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) {
+      return "";
+    }
+    return String(value);
+  }
+
   if (typeof value !== "string") {
     return "";
   }
@@ -281,54 +570,19 @@ function parseCustomUsers(rawUsers) {
 }
 
 function readCustomUsersFromStorage() {
-  if (typeof window === "undefined") {
-    return [];
-  }
-
-  try {
-    const raw = window.localStorage.getItem(TEST_USER_LIST_KEY);
-    return parseCustomUsers(raw ? JSON.parse(raw) : []);
-  } catch {
-    return [];
-  }
+  return getUsersState().customUsers;
 }
 
 function readPasswordStore() {
-  if (typeof window === "undefined") {
-    return {};
-  }
-
-  try {
-    const raw = window.localStorage.getItem(USER_PASSWORDS_KEY);
-    if (!raw) {
-      return {};
-    }
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object") {
-      return {};
-    }
-    const map = {};
-    Object.keys(parsed).forEach((key) => {
-      const value = normalizePassword(parsed[key]);
-      if (key && value) {
-        map[key] = value;
-      }
-    });
-    return map;
-  } catch {
-    return {};
-  }
+  return getUsersState().passwords;
 }
 
 function writePasswordStore(map) {
-  if (typeof window === "undefined") {
-    return;
-  }
-  try {
-    window.localStorage.setItem(USER_PASSWORDS_KEY, JSON.stringify(map || {}));
-  } catch {
-    // no-op
-  }
+  usersStateCache = {
+    ...(getUsersState() || {}),
+    passwords: normalizeUserPasswordMap(map)
+  };
+  syncUsersStateToServer(usersStateCache);
 }
 
 function getPasswordForUserId(userId) {
@@ -344,15 +598,11 @@ function getPasswordForUserId(userId) {
 }
 
 function writeCustomUsersToStorage(users) {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  try {
-    window.localStorage.setItem(TEST_USER_LIST_KEY, JSON.stringify(users));
-  } catch {
-    // no-op
-  }
+  usersStateCache = {
+    ...(getUsersState() || {}),
+    customUsers: parseCustomUsers(users)
+  };
+  syncUsersStateToServer(usersStateCache);
 }
 
 function getConfiguredUserList() {
@@ -433,7 +683,7 @@ function isBuiltInUser(userId) {
 }
 
 function syncAllowedForUser(userId) {
-  return isBuiltInUser(userId);
+  return isKnownUserId(userId);
 }
 
 function isKnownUserId(userId) {
@@ -592,6 +842,17 @@ function mergeRemotePlaceState(state, remoteState) {
     }, {});
 }
 
+function mergeRemoteUsersState(remoteState) {
+  if (!remoteState || typeof remoteState !== "object" || Array.isArray(remoteState)) {
+    return null;
+  }
+  const nextState = setUsersState({
+    customUsers: parseCustomUsers(remoteState.customUsers || remoteState.custom || remoteState.seats),
+    passwords: normalizeUserPasswordMap(remoteState.passwords || remoteState.password)
+  });
+  return nextState;
+}
+
 function mapRankingEntry(raw) {
   if (!raw || typeof raw !== "object") {
     return null;
@@ -616,7 +877,7 @@ export async function hydrateUserRankingStateFromServer(userId) {
   }
 
   const state = getStorageState();
-  if (!isBuiltInUser(trimmedUserId)) {
+  if (!isKnownUserId(trimmedUserId)) {
     return commitAndGetSnapshot(state, trimmedUserId);
   }
   ensureUser(state, trimmedUserId);
@@ -657,14 +918,24 @@ export async function hydrateAppStateFromServer() {
 
     const payload = await response.json();
     const remotePlaces = payload?.places;
+    const remoteUsers = payload?.users;
     if (!remotePlaces) {
-      return null;
+      if (!remoteUsers) {
+        return null;
+      }
+    }
+
+    if (remoteUsers) {
+      mergeRemoteUsersState(remoteUsers);
     }
 
     const state = getStorageState();
-    mergeRemotePlaceState(state, remotePlaces);
-    saveState(state);
-    return state;
+    if (remotePlaces) {
+      mergeRemotePlaceState(state, remotePlaces);
+      saveState(state);
+      return state;
+    }
+    return getStorageState();
   } catch {
     return null;
   }
@@ -707,81 +978,54 @@ function baseState() {
 }
 
 function getStorageState() {
-  if (typeof window === "undefined") {
-    return baseState();
+  if (!stateCache) {
+    stateCache = baseState();
   }
 
-    try {
-      const stored = window.localStorage.getItem(STORAGE_KEY);
-      if (!stored) {
-        return baseState();
-      }
-      const parsed = JSON.parse(stored);
-      const merged = baseState();
-      merged.users = {
-      ...merged.users,
-      ...(parsed.users || {})
-    };
-      const configuredIds = new Set(getConfiguredUserList().map((user) => user.id));
-      Object.keys(merged.users).forEach((userId) => {
-        if (!configuredIds.has(userId)) {
-          delete merged.users[userId];
-        }
-      });
-      Object.keys(merged.users).forEach((userId) => {
-        ensureUser(merged, userId);
-        const user = merged.users[userId];
-      user.ranking = normalizeList(user.ranking);
-      user.pending = normalizeList(user.pending);
-      user.undoStack = normalizeList(user.undoStack);
-      user.session = normalizeSessionState(user.session);
-    });
-    merged.places = {
-      custom: Array.isArray(parsed.places?.custom) ? parsed.places.custom : [],
-      [PLACE_STATE_CLOSED_KEY]: Array.isArray(parsed.places?.[PLACE_STATE_CLOSED_KEY])
-        ? normalizePlaceIdList(parsed.places[PLACE_STATE_CLOSED_KEY])
-        : [],
-      [PLACE_ORDER_NOTES_KEY]: normalizePlaceOrderNotes(parsed.places?.[PLACE_ORDER_NOTES_KEY]),
-      [PLACE_HOST_MAP_KEY]: (() => {
-        const map = parsed.places?.[PLACE_HOST_MAP_KEY];
-        return map && typeof map === "object" && !Array.isArray(map) ? map : {};
-      })()
-    };
-    merged.version = parsed.version || SCHEMA_VERSION;
-
-    const allPlaces = allChronologicalPlaces(merged);
-    const validPlaceIds = new Set(allPlaces.map((place) => place.id));
-    merged.places[PLACE_STATE_CLOSED_KEY] = merged.places[PLACE_STATE_CLOSED_KEY].filter((id) =>
-      validPlaceIds.has(id)
-    );
-    const hostMap = merged.places[PLACE_HOST_MAP_KEY] || {};
-    const validHostMap = {};
-    Object.keys(hostMap).forEach((placeId) => {
-      const normalizedPlaceId = safeString(placeId);
-      const hostUserId = safeString(hostMap[placeId]);
-      if (!normalizedPlaceId || !validPlaceIds.has(normalizedPlaceId)) {
-        return;
-      }
-      if (hostUserId && hostUserId !== PLACE_HOST_ALL && !isKnownUserId(hostUserId)) {
-        return;
-      }
-      validHostMap[normalizedPlaceId] = hostUserId;
-    });
-    merged.places[PLACE_HOST_MAP_KEY] = validHostMap;
-    return merged;
-  } catch (error) {
-    return baseState();
+  if (!stateCache || typeof stateCache !== "object") {
+    stateCache = baseState();
   }
+
+  const state = stateCache;
+  state.places = state.places || {};
+  state.places.custom = Array.isArray(state.places.custom) ? state.places.custom : [];
+  state.places[PLACE_STATE_CLOSED_KEY] = normalizePlaceIdList(state.places[PLACE_STATE_CLOSED_KEY]);
+  state.places[PLACE_ORDER_NOTES_KEY] = normalizePlaceOrderNotes(state.places[PLACE_ORDER_NOTES_KEY]);
+  state.places[PLACE_HOST_MAP_KEY] = (() => {
+    const map = state.places[PLACE_HOST_MAP_KEY];
+    return map && typeof map === "object" && !Array.isArray(map) ? map : {};
+  })();
+
+  mergeConfiguredUsersIntoState(state);
+  state.version = Number.isFinite(state.version) ? state.version : SCHEMA_VERSION;
+
+  const allPlaces = allChronologicalPlaces(state);
+  const validPlaceIds = allKnownPlaceIdsFromState(state);
+  state.places[PLACE_STATE_CLOSED_KEY] = normalizePlaceIdList(state.places[PLACE_STATE_CLOSED_KEY]).filter((id) =>
+    validPlaceIds.has(id)
+  );
+  const hostMap = state.places[PLACE_HOST_MAP_KEY] || {};
+  const validHostMap = {};
+  Object.keys(hostMap).forEach((placeId) => {
+    const normalizedPlaceId = safeString(placeId);
+    const hostUserId = safeString(hostMap[placeId]);
+    if (!normalizedPlaceId || !validPlaceIds.has(normalizedPlaceId)) {
+      return;
+    }
+    if (hostUserId && hostUserId !== PLACE_HOST_ALL && !isKnownUserId(hostUserId)) {
+      return;
+    }
+    validHostMap[normalizedPlaceId] = hostUserId;
+  });
+  state.places[PLACE_HOST_MAP_KEY] = validHostMap;
+
+  return state;
 }
 
 function saveState(state) {
-  if (typeof window === "undefined") {
-    return;
-  }
-  try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch (error) {
-    // no-op if localStorage is unavailable
+  stateCache = state;
+  if (state) {
+    state.version = SCHEMA_VERSION;
   }
 }
 
@@ -884,15 +1128,20 @@ function nextUnrankedPlace(allPlaces, user) {
 
 function allChronologicalPlaces(state) {
   const custom = Array.isArray(state.places?.custom) ? state.places.custom : [];
+  const dbPlaces = getDbPlaces().map((place) => ({
+    ...place,
+    source: "db"
+  }));
   const closedSet = new Set(normalizePlaceIdList(state.places?.[PLACE_STATE_CLOSED_KEY]));
   const hostMap = state.places?.[PLACE_HOST_MAP_KEY] || {};
   const orderNotes = normalizePlaceOrderNotes(state.places?.[PLACE_ORDER_NOTES_KEY]);
   const staticPlaces = flatbreadLocations.map(hydrateBasePlace);
   const customPlaces = custom.map(sanitizePlace).map(hydrateCustomPlace);
+  const allCandidates = [...dbPlaces, ...staticPlaces, ...customPlaces];
 
   const seen = new Set();
   const places = [];
-  for (const place of [...staticPlaces, ...customPlaces]) {
+  for (const place of allCandidates) {
     if (!place.id || seen.has(place.id)) {
       continue;
     }
@@ -1241,11 +1490,13 @@ function userNameForId(userId) {
 }
 
 export function getAllPlaces() {
+  void hydratePlacesFromServer();
   const state = getStorageState();
   return allChronologicalPlaces(state);
 }
 
 export function getClosedPlaces() {
+  void hydratePlacesFromServer();
   const state = getStorageState();
   return allChronologicalPlaces(state).filter((place) => place.isClosed);
 }
