@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { hydrateAppStateFromServer } from "../utils/rankingStore";
+import { hydrateCustomPlaceHintsFromServer } from "../utils/placeCallouts";
 import "../styles/globals.css";
 
 const HONOR_LINES = [
@@ -14,6 +16,12 @@ export default function App({ Component, pageProps }) {
   const [honorIndex, setHonorIndex] = useState(0);
 
   useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    void hydrateAppStateFromServer();
+    void hydrateCustomPlaceHintsFromServer();
+
     const onDocumentClick = (event) => {
       const trigger = event.target?.closest?.("[data-honor-trigger='true']");
       if (!trigger) {

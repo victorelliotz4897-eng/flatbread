@@ -3,6 +3,7 @@ import { flatbreadLocations } from "../data/locations";
 const STORAGE_KEY = "flatbread-ranking-state-v1";
 const SCHEMA_VERSION = 1;
 const RANKING_SYNC_ENDPOINT = "/api/rankings";
+const APP_STATE_SYNC_ENDPOINT = "/api/app-state";
 const TEST_USER_LIST_KEY = "flatbread-test-user-accounts-v1";
 const USER_PASSWORDS_KEY = "flatbread-user-passwords-v1";
 const PLACE_STATE_CLOSED_KEY = "closedPlaceIds";
@@ -462,20 +463,133 @@ function syncRankingStateToServer(userId, state) {
     updated_at: new Date().toISOString()
   };
 
+  const logPrefix = "[flatbread-ranking-sync]";
+  const send = async () => {
+    try {
+      const response = await fetch(RANKING_SYNC_ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload),
+        keepalive: true
+      });
+      if (!response.ok) {
+        const responseText = await response.text().catch(() => "");
+        console.warn(
+          `${logPrefix} failed for ${userId}`,
+          response.status,
+          responseText
+        );
+      }
+    } catch (error) {
+      console.warn(`${logPrefix} request error for ${userId}`, error);
+    }
+  };
+
   try {
-    fetch(RANKING_SYNC_ENDPOINT, {
+    void send();
+  } catch {
+    // no-op
+  }
+}
+
+function normalizePlaceStatePayload(state) {
+  const places = state?.places || {};
+  return {
+    custom: Array.isArray(places.custom) ? places.custom.map(sanitizePlace).map(hydrateCustomPlace) : [],
+    [PLACE_STATE_CLOSED_KEY]: normalizePlaceIdList(places?.[PLACE_STATE_CLOSED_KEY]),
+    [PLACE_HOST_MAP_KEY]: (() => {
+      const map = places?.[PLACE_HOST_MAP_KEY];
+      if (!map || typeof map !== "object" || Array.isArray(map)) {
+        return {};
+      }
+      const normalizedMap = {};
+      Object.entries(map).forEach(([placeId, hostUserId]) => {
+        const key = safeString(placeId);
+        const value = safeString(hostUserId);
+        if (!key) {
+          return;
+        }
+        if (!value || value === PLACE_HOST_ALL || isKnownUserId(value)) {
+          normalizedMap[key] = value || "";
+        }
+      });
+      return normalizedMap;
+    })(),
+    [PLACE_ORDER_NOTES_KEY]: normalizePlaceOrderNotes(places?.[PLACE_ORDER_NOTES_KEY])
+  };
+}
+
+function syncPlaceStateToServer(state) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const payload = {
+    places: normalizePlaceStatePayload(state)
+  };
+
+  const send = async () => {
+    const response = await fetch(APP_STATE_SYNC_ENDPOINT, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
       },
       body: JSON.stringify(payload),
       keepalive: true
-    }).catch(() => {
-      // best-effort sync; local fallback remains source of truth
     });
+    if (!response.ok) {
+      const responseText = await response.text().catch(() => "");
+      console.warn("[flatbread-app-state-sync] failed", response.status, responseText);
+    }
+  };
+
+  try {
+    void send();
   } catch {
     // no-op
   }
+}
+
+function mergeRemotePlaceState(state, remoteState) {
+  const incoming = remoteState || {};
+  const safeIncomingPlaces = incoming && typeof incoming === "object" && !Array.isArray(incoming)
+    ? incoming
+    : {};
+
+  const merged = state.places || baseState().places;
+  const remoteCustom = Array.isArray(safeIncomingPlaces.custom)
+    ? safeIncomingPlaces.custom
+      .map(sanitizePlace)
+      .filter((place) => place && place.id && place.name && place.date)
+    : merged.custom;
+  const remoteClosed = normalizePlaceIdList(safeIncomingPlaces[PLACE_STATE_CLOSED_KEY]);
+  const remoteHostMap = safeIncomingPlaces?.[PLACE_HOST_MAP_KEY];
+  const remoteHostMapNormalized = remoteHostMap && typeof remoteHostMap === "object" && !Array.isArray(remoteHostMap)
+    ? remoteHostMap
+    : {};
+  const remoteOrderNotes = normalizePlaceOrderNotes(safeIncomingPlaces[PLACE_ORDER_NOTES_KEY]);
+
+  state.places = {
+    ...merged,
+    custom: remoteCustom,
+    [PLACE_STATE_CLOSED_KEY]: remoteClosed.length > 0 ? remoteClosed : [],
+    [PLACE_HOST_MAP_KEY]: remoteHostMapNormalized,
+    [PLACE_ORDER_NOTES_KEY]: remoteOrderNotes
+  };
+  state.places[PLACE_HOST_MAP_KEY] = Object.entries(state.places[PLACE_HOST_MAP_KEY] || {})
+    .reduce((map, [placeId, hostUserId]) => {
+      const normalizedPlaceId = safeString(placeId);
+      const normalizedHost = safeString(hostUserId);
+      if (!normalizedPlaceId) {
+        return map;
+      }
+      if (!normalizedHost || normalizedHost === PLACE_HOST_ALL || isKnownUserId(normalizedHost)) {
+        map[normalizedPlaceId] = normalizedHost;
+      }
+      return map;
+    }, {});
 }
 
 function mapRankingEntry(raw) {
@@ -527,6 +641,32 @@ export async function hydrateUserRankingStateFromServer(userId) {
     return commitAndGetSnapshot(state, trimmedUserId);
   } catch {
     return commitAndGetSnapshot(state, trimmedUserId);
+  }
+}
+
+export async function hydrateAppStateFromServer() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    const response = await fetch(APP_STATE_SYNC_ENDPOINT);
+    if (!response.ok) {
+      return null;
+    }
+
+    const payload = await response.json();
+    const remotePlaces = payload?.places;
+    if (!remotePlaces) {
+      return null;
+    }
+
+    const state = getStorageState();
+    mergeRemotePlaceState(state, remotePlaces);
+    saveState(state);
+    return state;
+  } catch {
+    return null;
   }
 }
 
@@ -1136,6 +1276,7 @@ export function togglePlaceClosedState(placeId) {
     current.delete(id);
     state.places[PLACE_STATE_CLOSED_KEY] = Array.from(current);
     saveState(state);
+    syncPlaceStateToServer(state);
     return {
       updated: true,
       isClosed: false,
@@ -1146,6 +1287,7 @@ export function togglePlaceClosedState(placeId) {
   current.add(id);
   state.places[PLACE_STATE_CLOSED_KEY] = Array.from(current);
   saveState(state);
+  syncPlaceStateToServer(state);
   return {
     updated: true,
     isClosed: true,
@@ -1362,6 +1504,7 @@ export function addPlaceAndTriggerRanking(input, options = {}) {
   }
 
   saveState(current);
+  syncPlaceStateToServer(current);
   return {
     added: true,
     place: {
@@ -1437,6 +1580,7 @@ export function setPlaceHost(placeId, hostUserId) {
     [PLACE_HOST_MAP_KEY]: hostMap
   };
   saveState(state);
+  syncPlaceStateToServer(state);
   return {
     updated: true,
     placeId: resolvedPlaceId,
@@ -1480,6 +1624,7 @@ export function setPlaceOrderedItems(placeId, orderedItems) {
   }
 
   saveState(state);
+  syncPlaceStateToServer(state);
   return {
     updated: true,
     placeId: resolvedPlaceId,
@@ -1620,6 +1765,7 @@ export function removeTestUser(userId) {
       };
     });
   }
+  syncPlaceStateToServer(state);
   saveState(state);
 
   return {

@@ -29,6 +29,7 @@ const RAW_PLACE_HINTS = {
 };
 
 const CUSTOM_HINTS_STORAGE_KEY = "flatbread-custom-place-hints-v1";
+const APP_STATE_SYNC_ENDPOINT = "/api/app-state";
 
 const CANONICAL_LABELS = {
   "ignazio's": "Ignazio's",
@@ -100,6 +101,96 @@ function setCustomPlaceHintsStorage(nextHints) {
   } catch {
     return;
   }
+}
+
+async function syncCustomHintsToServer(nextHints) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const send = async () => {
+    const response = await fetch(APP_STATE_SYNC_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ jokes: nextHints }),
+      keepalive: true
+    });
+    if (!response.ok) {
+      const responseText = await response.text().catch(() => "");
+      console.warn("[flatbread-honor-sync] failed", response.status, responseText);
+    }
+  };
+
+  try {
+    void send();
+  } catch {
+    // no-op
+  }
+}
+
+function formatHintsForSync(hints) {
+  const payload = {};
+  if (!hints || typeof hints !== "object" || Array.isArray(hints)) {
+    return payload;
+  }
+  Object.entries(hints).forEach(([normalizedKey, value]) => {
+    const normalized = normalizePlaceHintKey(normalizedKey);
+    if (!normalized) {
+      return;
+    }
+
+    if (typeof value === "string") {
+      const hint = value.trim();
+      if (!hint) {
+        return;
+      }
+      payload[normalized] = {
+        display: rawLabelFromNormalized(normalized),
+        hint
+      };
+      return;
+    }
+
+    if (value && typeof value === "object") {
+      const hint = String(value.hint || "").trim();
+      if (!hint) {
+        return;
+      }
+      const display = String(value.display || rawLabelFromNormalized(normalized)).trim();
+      payload[normalized] = {
+        display: display || rawLabelFromNormalized(normalized),
+        hint
+      };
+    }
+  });
+  return payload;
+}
+
+export async function hydrateCustomPlaceHintsFromServer() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    const response = await fetch(APP_STATE_SYNC_ENDPOINT);
+    if (!response.ok) {
+      return null;
+    }
+
+    const payload = await response.json();
+    const remote = payload?.jokes;
+    const normalized = formatHintsForSync(remote);
+    if (Object.keys(normalized).length > 0) {
+      setCustomPlaceHintsStorage(normalized);
+      return normalized;
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
 }
 
 function getCustomPlaceHintMap() {
@@ -251,6 +342,7 @@ export function saveCustomPlaceHint(placeName, hint) {
     hint: trimmedHint
   };
   setCustomPlaceHintsStorage(nextHints);
+  syncCustomHintsToServer(formatHintsForSync(nextHints));
   return {
     updated: true,
     message: "Honor joke saved."
@@ -274,6 +366,7 @@ export function removeCustomPlaceHint(normalizedOrDisplay) {
   }
   delete nextHints[normalized];
   setCustomPlaceHintsStorage(nextHints);
+  syncCustomHintsToServer(formatHintsForSync(nextHints));
   return {
     updated: true,
     message: "Honor joke removed."
