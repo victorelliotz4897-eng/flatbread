@@ -16,6 +16,8 @@ let dbPlacesHydrated = false;
 let usersStateHydrationPromise = null;
 let usersStateCache = null;
 let stateCache = null;
+const rankingSyncQueues = new Map();
+const rankingSyncListeners = new Set();
 
 const DEFAULT_USER_PASSWORDS = {
   victor: "robertas",
@@ -702,18 +704,45 @@ function isKnownUserId(userId) {
   return getConfiguredUserList().some((user) => user.id === userId);
 }
 
+function emitRankingSyncStatus(detail) {
+  rankingSyncListeners.forEach((listener) => {
+    try {
+      listener(detail);
+    } catch {
+      // A status listener must never interrupt persistence.
+    }
+  });
+}
+
+export function subscribeToRankingSync(listener) {
+  if (typeof listener !== "function") {
+    return () => {};
+  }
+  rankingSyncListeners.add(listener);
+  return () => rankingSyncListeners.delete(listener);
+}
+
+export function waitForRankingSync(userId) {
+  return rankingSyncQueues.get(safeString(userId)) || Promise.resolve({ ok: true });
+}
+
+export function retryRankingSync(userId) {
+  const resolvedUserId = safeString(userId);
+  return syncRankingStateToServer(resolvedUserId, getStorageState());
+}
+
 function syncRankingStateToServer(userId, state) {
   if (typeof window === "undefined") {
-    return;
+    return Promise.resolve({ ok: false, error: "Ranking sync is only available in the browser." });
   }
 
   if (!syncAllowedForUser(userId)) {
-    return;
+    return Promise.resolve({ ok: false, error: "Unknown ranking user." });
   }
 
   const user = state?.users?.[userId];
   if (!user || !safeString(userId)) {
-    return;
+    return Promise.resolve({ ok: false, error: "Missing ranking state." });
   }
 
   const payload = {
@@ -727,33 +756,42 @@ function syncRankingStateToServer(userId, state) {
 
   const logPrefix = "[flatbread-ranking-sync]";
   const send = async () => {
-    try {
-      const response = await fetch(RANKING_SYNC_ENDPOINT, {
+    const response = await fetch(RANKING_SYNC_ENDPOINT, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
         },
-        body: JSON.stringify(payload),
-        keepalive: true
+        body: JSON.stringify(payload)
       });
-      if (!response.ok) {
-        const responseText = await response.text().catch(() => "");
-        console.warn(
-          `${logPrefix} failed for ${userId}`,
-          response.status,
-          responseText
-        );
-      }
-    } catch (error) {
-      console.warn(`${logPrefix} request error for ${userId}`, error);
+    if (!response.ok) {
+      const responseText = await response.text().catch(() => "");
+      throw new Error(responseText || `Save failed (${response.status}).`);
     }
+    return { ok: true };
   };
 
-  try {
-    void send();
-  } catch {
-    // no-op
-  }
+  // Serialize writes per user. Previously every click wrote concurrently, so a
+  // slower, older request could overwrite the final completed ranking.
+  const previous = rankingSyncQueues.get(userId) || Promise.resolve();
+  emitRankingSyncStatus({ userId, status: "saving" });
+  const queued = previous
+    .catch(() => undefined)
+    .then(send)
+    .then((result) => {
+      emitRankingSyncStatus({ userId, status: "saved" });
+      return result;
+    })
+    .catch((error) => {
+      console.warn(`${logPrefix} request error for ${userId}`, error);
+      emitRankingSyncStatus({
+        userId,
+        status: "error",
+        message: safeString(error?.message) || "Ranking could not be saved."
+      });
+      return { ok: false, error: safeString(error?.message) || "Ranking could not be saved." };
+    });
+  rankingSyncQueues.set(userId, queued);
+  return queued;
 }
 
 function normalizePlaceStatePayload(state) {
